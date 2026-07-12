@@ -20,7 +20,7 @@ This app's largest attack surface is the OpenAI API key. This is the one place y
 ## Dependencies
 
 - Add dependencies via **npm only**. Do not introduce non-npm tools, vendored binaries, or `curl | sh`-style installers.
-- Allowed licenses are **MIT / BSD / Apache-2.0 / ISC** only. Do not add GPL/AGPL/SSPL, etc. (consult a human in the PR if needed).
+- Allowed licenses: **MIT, ISC, Apache-2.0, BSD (2-Clause / 3-Clause / plain), 0BSD, Unlicense, CC0-1.0, CC-BY-4.0, LGPL-3.0-or-later**. This already covers the current transitive tree (e.g. `sharp` is Apache-2.0 AND LGPL-3.0-or-later, `caniuse-lite` is CC-BY-4.0). Do not add GPL/AGPL/SSPL or anything outside this list without human sign-off in the PR. Enforced exactly by CI's `licenses` job and mirrored by `npm run license:check`.
 - **Do not add dependencies with known vulnerabilities (high or above)** (CI's `npm audit` will fail).
 - Always state the reason for a new dependency in the PR description. Do not add a dependency for something the standard library or Next.js built-ins already cover.
 

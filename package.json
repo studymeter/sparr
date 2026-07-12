@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "license:check": "license-checker-rseidelsohn --production --onlyAllow \"MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;BSD;0BSD;Unlicense;CC0-1.0;CC-BY-4.0;LGPL-2.0;LGPL-2.1;LGPL-3.0;LGPL-2.0-or-later;LGPL-2.1-or-later;LGPL-3.0-or-later\" --excludePrivatePackages",
+    "license:check": "license-checker-rseidelsohn --production --onlyAllow \"MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;BSD;0BSD;Unlicense;CC0-1.0;CC-BY-4.0;LGPL-3.0-or-later\" --excludePrivatePackages",
     "security:check": "npm run license:check",
     "prepare": "husky",
     "api:lint": "redocly lint",
