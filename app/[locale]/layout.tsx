@@ -28,7 +28,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: "metadata" });
 
   return {
-    metadataBase: new URL("https://sparr.studymeter.jp"),
+    // The app is served at app.sparr.studymeter.jp; sparr.studymeter.jp is
+    // the marketing site and does not host /ogp.png.
+    metadataBase: new URL("https://app.sparr.studymeter.jp"),
     title: {
       default: t("title"),
       template: `%s | ${t("title")}`,
@@ -40,7 +42,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     openGraph: {
       type: "website",
-      url: "https://sparr.studymeter.jp",
+      url: "https://app.sparr.studymeter.jp",
       title: t("title"),
       description: t("description"),
       siteName: t("siteName"),
