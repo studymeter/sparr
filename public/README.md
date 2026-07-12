@@ -1,4 +1,6 @@
-# public/ 静的アセット
+# public/ static assets
 
-- `title.png` … タイトルロゴ画像。トップ（大）とローディング（中）に表示されます。
-  この名前で画像を置いてください。未設置の場合はテキスト見出しにフォールバックします。
+- `logo.png` — Sparr wordmark. Rendered by `components/BrandLogo.tsx` in every screen header and on the boot screen.
+- `logo_squared.png` — square logo, used as favicon / apple-touch icon.
+- `ogp.png` — Open Graph / Twitter card image, referenced from the root layout metadata.
+- `Studymeter_logo.png` — "Powered by" logo in the footer.

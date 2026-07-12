@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import BrandLogo from "@/components/BrandLogo";
 import type { GameState } from "@/lib/types";
 import type { ScoreResult } from "@/lib/prompts/score";
 
@@ -267,11 +268,8 @@ function RevealedView({
     <div className="briefing result-page">
       <div className="briefing-inner">
         <header className="mp-header briefing-header">
-          <a
-            href="https://sparr.studymeter.jp/"
-            className="mp-brand sm-gradient-text"
-          >
-            Sparr
+          <a href="https://sparr.studymeter.jp/" className="mp-brand">
+            <BrandLogo />
           </a>
         </header>
         <div className="rp-header">

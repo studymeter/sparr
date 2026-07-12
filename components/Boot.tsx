@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { useGame } from "@/app/store";
+import BrandLogo from "@/components/BrandLogo";
 import {
   BOOT_PROGRESS_CEILING,
   BOOT_READY_DELAY_MS,
@@ -146,7 +147,9 @@ export default function Boot({
 
   return (
     <div className="boot">
-      <h1 className="boot-brand sm-gradient-text">Sparr</h1>
+      <h1 className="boot-brand">
+        <BrandLogo className="boot-brand-logo" />
+      </h1>
       {!error ? (
         <ProgressView progress={progress} />
       ) : (

@@ -31,11 +31,11 @@
     "localeSwitchAria": "Switch to Japanese"
   },
   "metadata": {
-    "title": "A Project Manager's Worst Day",
-    "description": "Your DX project is on fire! Angry users, a blame-shifting boss, disengaged teammates… As PM, navigate the crisis through live calls!",
-    "siteName": "A Project Manager's Worst Day",
-    "twitterDescription": "Your DX project is on fire! As PM, navigate the crisis through live calls!",
-    "ogAlt": "A Project Manager's Worst Day",
+    "title": "Sparr",
+    "description": "Sparr is a self-hosted engine for roleplaying real work situations with AI. Talk by voice with AI-played characters and get scored feedback at the end.",
+    "siteName": "Sparr",
+    "twitterDescription": "Roleplay real work situations by voice with AI-played characters, and get scored feedback.",
+    "ogAlt": "Sparr",
     "signIn": "Sign in",
     "signUp": "Sign up",
     "account": "Account settings",
@@ -45,7 +45,8 @@
   "footer": {
     "company": "Company",
     "privacy": "Privacy Policy",
-    "terms": "Terms of Use"
+    "terms": "Terms of Use",
+    "tokushoho": "Commercial Disclosure"
   },
   "contact": {
     "title": "We build custom scenarios for your organization",
@@ -244,7 +245,7 @@
     }
   },
   "admin": {
-    "brand": "Sparr Admin",
+    "brandSuffix": "Admin",
     "playerLink": "Go to player →",
     "tabs": {
       "dashboard": "Dashboard",

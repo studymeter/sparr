@@ -2,6 +2,7 @@
 
 import type { GameState } from "@/lib/types";
 import { useTranslations } from "next-intl";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function Briefing({
   game,
@@ -15,11 +16,8 @@ export default function Briefing({
   return (
     <div className="briefing">
       <header className="mp-header briefing-header">
-        <a
-          href="https://sparr.studymeter.jp/"
-          className="mp-brand sm-gradient-text"
-        >
-          Sparr
+        <a href="https://sparr.studymeter.jp/" className="mp-brand">
+          <BrandLogo />
         </a>
       </header>
       <div className="briefing-inner">

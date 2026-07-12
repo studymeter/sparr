@@ -14,6 +14,7 @@ import {
 import SignOutButton from "@/components/SignOutButton";
 import Footer from "@/components/Footer";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
+import BrandLogo from "@/components/BrandLogo";
 
 type Account = {
   id: string;
@@ -268,11 +269,8 @@ function MyPageHeader({
   const t = useTranslations("mypage");
   return (
     <header className="mp-header">
-      <Link
-        href="https://sparr.studymeter.jp/"
-        className="mp-brand sm-gradient-text"
-      >
-        Sparr
+      <Link href="https://sparr.studymeter.jp/" className="mp-brand">
+        <BrandLogo />
       </Link>
 
       {/* Desktop nav; on mobile a hamburger menu (signed-in only) */}

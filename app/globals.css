@@ -3773,6 +3773,21 @@ body {
   text-decoration: none;
 }
 
+.brand-logo {
+  height: 28px;
+  width: auto;
+  display: block;
+}
+
+.brand-logo-admin {
+  height: 22px;
+}
+
+.boot-brand-logo {
+  height: clamp(44px, 9vw, 64px);
+  width: auto;
+}
+
 .mp-login,
 .mp-account {
   display: inline-flex;

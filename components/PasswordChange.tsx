@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import PasswordInput from "@/components/PasswordInput";
+import BrandLogo from "@/components/BrandLogo";
 import Footer from "@/components/Footer";
 
 type Translate = ReturnType<typeof useTranslations>;
@@ -107,8 +108,8 @@ function PasswordChangeChrome({
   return (
     <div className="mp-page">
       <header className="mp-header">
-        <Link href="/" className="mp-brand sm-gradient-text">
-          Sparr
+        <Link href="/" className="mp-brand">
+          <BrandLogo />
         </Link>
         <nav className="mp-nav">
           <Link href="/mypage" className="btn-tertiary">
