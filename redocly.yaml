@@ -1,0 +1,10 @@
+apis:
+  player:
+    root: ./docs/design/Endpoint/openapi.yaml
+  admin:
+    root: ./docs/design/Endpoint/openapi-admin.yaml
+
+rules:
+  operation-operationId: error
+  operation-summary: error
+  no-unused-components: warn

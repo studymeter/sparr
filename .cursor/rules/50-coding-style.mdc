@@ -1,0 +1,47 @@
+---
+description: コーディング規約（正本は CODING-GUIDELINES.md）
+alwaysApply: true
+---
+
+# 正本
+
+詳細は `CODING-GUIDELINES.md`。ここは行動チェックリスト。
+基本思想: **他人が最短時間で理解できるコードを最優先**（『リーダブルコード』準拠）。
+
+# 命名ケース
+
+| ケース | 用途 | 例 |
+|--------|------|----|
+| **camelCase**（既定） | 変数・関数・フック・自前プロパティ・非コンポーネントのファイル名 | `callLogs` / `assemblePrompt()` / `openai.ts` |
+| **PascalCase** | Reactコンポーネント・型・interface・enum・class | `CallScreen.tsx` / `type RootCause` |
+| **snake_case**（境界のみ） | 外部API（OpenAI等）のJSONフィールドをそのまま写す時だけ | `input_audio_transcription` |
+| **UPPER_SNAKE_CASE** | 環境変数・モジュールレベルの真の定数 | `OPENAI_API_KEY` / `DOC_DELAY_MS` |
+
+**snake_case の境界ルール**: 外部の snake_case は `app/api/**` や `lib/openai.ts` で受け取った直後に camelCase へ変換する。アプリ内部に snake_case を持ち込まない。
+
+# コメント
+
+「何をしているか」は書かない（コードを読めばわかる）。書くのは **「なぜそうしたか」**（制約・背景・非自明な理由）。
+未完: `TODO:` / 危うい回避策: `HACK:` / 注意喚起: `NOTE:`
+
+# 制御フロー・関数
+
+- ガード節・早期リターンでネストを浅く保つ
+- 1関数1責務。巨大関数は分割。引数が多ければオブジェクトにまとめる
+- 複雑な条件は説明変数に名前を付けて分解する
+
+# TypeScript・一貫性
+
+- `any` を避ける。`unknown` ＋ 型絞り込みを使う
+- マジックナンバー・文字列は `lib/constants.ts` 等へ定数化（UPPER_SNAKE_CASE）
+- Prettier / ESLint の結果に従う。自分の好みで競合させない
+
+# やり過ぎない
+
+- 早すぎる抽象化・過度な共通化をしない（設計思想「丸めない」と同じ）
+- まず素直に書き、重複や複雑さが実際に問題になってから整える
+
+# 機械強制
+
+命名ケース・`any` 禁止・複雑度・関数長・ネスト深さ等は ESLint で自動判定。
+`npm run lint` を通せばこの規約の大半を満たす。

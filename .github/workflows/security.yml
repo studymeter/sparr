@@ -1,0 +1,124 @@
+name: security
+
+# The non-bypassable gate. Runs on GitHub's servers, not a developer's machine,
+# so it applies no matter who wrote the code or which tool they used.
+#
+# To make it "absolutely cannot be kicked":
+#   Settings -> Branches -> add a branch protection rule for `main`:
+#     - Require a pull request before merging (no direct pushes)
+#     - Require status checks to pass:  secret-scan, dependencies, licenses,
+#       client-secret-leak, quality
+#     - Require branches to be up to date before merging
+#     - Do NOT allow bypassing the above settings  (applies to admins too)
+#     - Block force pushes and deletions
+# See SECURITY-SETUP.md for the full checklist.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    name: secret-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        # gitleaks-action@v2 requires a paid org license; run CLI directly instead.
+        # Version is pinned to avoid flaky GitHub API 504s during dynamic version lookup.
+        env:
+          GITLEAKS_VERSION: "8.18.4"
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar xz -C /tmp gitleaks
+          /tmp/gitleaks detect --source . --redact
+
+  dependencies:
+    name: dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Fail on known high/critical vulnerabilities in dependencies.
+      - name: npm audit (high+)
+        run: npm audit --audit-level=high
+
+  licenses:
+    name: licenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Allowlisted licenses only
+        run: |
+          npx --yes license-checker-rseidelsohn \
+            --production \
+            --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;BSD;0BSD;Unlicense;CC0-1.0;CC-BY-4.0;LGPL-3.0-or-later" \
+            --excludePrivatePackages
+
+  client-secret-leak:
+    name: client-secret-leak
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Static guard: secrets must never be reachable from the client bundle.
+      - name: No NEXT_PUBLIC_ secret-like vars
+        run: |
+          if grep -rInE 'NEXT_PUBLIC_[A-Za-z0-9_]*(KEY|SECRET|TOKEN|PASSWORD)' \
+               --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' \
+               --include='*.env*' . ; then
+            echo "::error::NEXT_PUBLIC_ に秘密情報らしき変数があります（クライアントへ漏れます）。"
+            exit 1
+          fi
+      - name: No server secret used in client components
+        run: |
+          fail=0
+          while IFS= read -r f; do
+            if grep -qE 'process\.env\.(OPENAI_API_KEY|[A-Z0-9_]*SECRET[A-Z0-9_]*|[A-Z0-9_]*API_KEY)' "$f"; then
+              echo "::error file=$f::\"use client\" のファイルがサーバ秘密(process.env)を参照しています。"
+              fail=1
+            fi
+          done < <(grep -rIlE '["'\'']use client["'\'']' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' . || true)
+          exit $fail
+      - name: No hardcoded provider keys
+        run: |
+          if grep -rInE 'sk-[A-Za-z0-9_-]{20,}' \
+               --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.json' . ; then
+            echo "::error::ハードコードされた API キーらしき文字列を検出。"
+            exit 1
+          fi
+
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type check
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+        env:
+          # Build must succeed without a real key. Use a dummy so missing-env
+          # doesn't fail the build, but the real key is never in CI.
+          OPENAI_API_KEY: "dummy-for-build-only"

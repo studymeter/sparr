@@ -1,0 +1,22 @@
+---
+description: クライアントコンポーネントの境界
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# クライアント側でやってよいこと
+
+- UI状態・クライアントタイマー・Realtime 接続（ephemeral key 経由）
+- サーバが発行した短命トークンの利用
+
+# 禁止
+
+- サーバ専用の環境変数（APIキー・SECRET 系）をクライアントから参照
+- 標準APIキーをクライアントバンドルへ含める設計
+- モデル出力を dangerouslySetInnerHTML 等でそのまま描画
+
+# Realtime
+
+アプリ内AIは OpenAI Realtime API。Claude/Anthropic API への差し替え禁止。
+
+秘密処理が必要なら `app/api/**` にルートを追加し、クライアントはそこを呼ぶ。

@@ -1,0 +1,47 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files (templates such as .env.example stay tracked)
+.env
+.env*.local
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# claude code personal overrides
+.claude/settings.local.json
+
+# Personal / local-only docs (whole tree; already-tracked files need git rm --cached)
+docs.local/*
+
+# SQLite databases (default path and ad-hoc test files)
+/data/
+*.db
+
+# push authorization token (created/deleted by Claude per push cycle)
+.push-authorized
+
+# personal, self-managed list of paths the AI must not touch (protected-paths guard)
+.protected.local
+
+# vercel
+.vercel

@@ -1,0 +1,31 @@
+---
+description: 設計参照と作業の進め方
+alwaysApply: true
+---
+
+# 実装前の必読
+
+1. `docs/architecture/` … 概念図・コンポーネント・データモデル（設計の正本）
+2. `prompts/common_base.md` … 全キャラ共通の地（手書き固定。AIに生成させない）
+3. キャラ個別は `common_base` + 毎回ランダム生成ブロックの2層
+
+# リファレンスシナリオの生成
+
+- 起動時に真因を1個ランダム決定し、毎回違うインスタンスを生成（リプレイ性）
+- 役割で知識差をつける（例: 知らない / 途中まで / 知って隠す）
+- 氏名も毎回生成。固定名にしない
+
+# 作業コマンド
+
+```bash
+npm run dev        # 開発サーバ
+npm run typecheck  # 型チェック
+npm run lint       # ESLint
+npm run build      # 本番ビルド
+npm run license:check
+```
+
+# 方針
+
+まず動かす > きれいにする。早すぎる抽象化はしない。
+新規依存はPR説明に理由を書く。標準ライブラリや Next.js 組み込みで足りるなら足さない。

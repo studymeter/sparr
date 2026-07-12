@@ -1,0 +1,69 @@
+{
+  "$comment": "Project-level Claude Code config, committed so every team member gets the same setup. enabledPlugins turns the official security-guidance plugin on for everyone who clones (incl. web sessions). hooks are the HARD, blocking layer (PreToolUse exit 2 blocks; Stop blocks finishing with broken types). Personal overrides go in settings.local.json (gitignored) and must NOT weaken these.",
+  "enabledPlugins": {
+    "security-guidance@claude-plugins-official": true
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/guard-secrets.sh",
+            "timeout": 15,
+            "statusMessage": "Scanning for secret leakage..."
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/guard-protected.sh",
+            "timeout": 15,
+            "statusMessage": "Checking protected paths..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/guard-bash.sh",
+            "timeout": 15,
+            "statusMessage": "Checking command safety..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/format.sh",
+            "timeout": 60,
+            "statusMessage": "Formatting..."
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/sync-cursor.sh",
+            "timeout": 30,
+            "statusMessage": "Syncing .cursor..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/verify.sh",
+            "timeout": 300,
+            "statusMessage": "Type-checking before finishing..."
+          }
+        ]
+      }
+    ]
+  }
+}

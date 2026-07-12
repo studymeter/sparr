@@ -1,0 +1,27 @@
+---
+description: プロジェクトの正本と作業方針
+alwaysApply: true
+---
+
+# 正本（実装前に必ず読む）
+
+- 設計思想・セキュリティ・作業方針: `CLAUDE.md`
+- 設計の本体（概念図・コンポーネント・データモデル）: `docs/architecture/`
+
+# これは何か
+
+AIロールプレイ研修エンジン（汎用・OSS）。同梱のリファレンスシナリオは社内DX炎上案件のPM体験。
+スタック: Next.js (App Router) + TypeScript。アプリ内AIは OpenAI Realtime + Chat Completions。
+Provider/Adapter 構成（AI / Voice / Auth / Store）。会話本文は永続化しない。
+
+# 作業方針
+
+- 仕様の穴を勝手に埋めない。判断がブレるなら手を止めて人間に確認する。
+- 体験の芯（ゴール・不可侵ルール等）はシナリオ側で定義する。エンジンの正本には書かない。
+- 担当外・他人の主幹領域は勝手に変えない（保護パスは `.protected.local` で宣言・人手管理）。
+
+# 完了の定義
+
+変更後は `npm run typecheck` と `npm run build` を通す。
+UI/対話変更はアプリを実際に起動して触ってから報告する。
+スコープ外のリファクタはしない。

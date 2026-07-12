@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/guard-bash.sh",
+        "timeout": 15,
+        "failClosed": true
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": ".cursor/hooks/guard-secrets.sh",
+        "matcher": "Write|StrReplace",
+        "timeout": 15,
+        "failClosed": true
+      },
+      {
+        "command": ".cursor/hooks/guard-protected.sh",
+        "matcher": "Write|StrReplace",
+        "timeout": 15,
+        "failClosed": false
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": ".cursor/hooks/guard-read.sh",
+        "timeout": 10,
+        "failClosed": true
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": ".cursor/hooks/format.sh",
+        "timeout": 60
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/verify-typecheck.sh",
+        "timeout": 300,
+        "loop_limit": 1
+      }
+    ]
+  }
+}

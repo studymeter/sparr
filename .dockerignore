@@ -1,0 +1,32 @@
+# dependencies and build output
+node_modules
+.next
+out
+build
+
+# local env and secrets
+.env
+.env*.local
+
+# git and editor
+.git
+.gitignore
+.cursor
+.claude
+.husky
+
+# docs and local-only trees
+docs.local
+*.md
+!public/README.md
+
+# databases and runtime data
+data
+*.db
+
+# misc
+.DS_Store
+npm-debug.log*
+.vercel
+.push-authorized
+.protected.local

@@ -1,0 +1,1174 @@
+openapi: 3.1.0
+info:
+  title: Sparr Player Endpoints
+  version: 1.0.0
+  description: |
+    Player-layer endpoint specification. Corresponds to the Player Endpoint
+    definitions in `docs/architecture/components.md`.
+    Each endpoint connects to external services or the DB through the Provider
+    layer (AuthProvider / AIProvider / VoiceProvider / Store).
+
+    Authentication: the canonical adapter handler is `app/api/auth/[...auth]`
+    (providers.auth.handlers delegation, framework-managed by the Auth adapter).
+    Credential sign-in (`/api/auth/signin`) and sign-out (`/api/auth/signout`)
+    are custom routes and are documented below. The session route and OAuth
+    provider delegation use the URL scheme derived from the adapter
+    (e.g. Auth.js: /api/auth/session) and are not listed here.
+
+    CSRF: protected via SameSite cookie attribute (Auth.js-independent).
+    No X-CSRF-Token header is required.
+
+    Business endpoints assume an authenticated principal obtained via getPrincipal().
+servers:
+  - url: http://localhost:3000
+    description: Local dev
+paths:
+  # -- Auth --------------------------------------------------------
+  # The canonical adapter handler is app/api/auth/[...auth] (providers.auth.handlers
+  # delegation, framework-managed by the Auth adapter). Credential sign-in and
+  # sign-out are custom routes documented below; the session route uses the
+  # adapter's URL scheme (e.g. Auth.js: /api/auth/session) and is not listed here.
+  # CSRF is protected via SameSite cookie attribute (Auth.js-independent).
+
+  /api/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a new player account
+      description: |
+        Delegates to providers.auth.register().
+
+        1. Accept RegisterRequest (email / credential / username?)
+        2. Call providers.auth.register() — validates, checks for duplicates, persists account
+        3. Return AuthResult (id / role) with 201; role is fixed to "player"
+
+        - If username is omitted, the local part of the email address is used
+        - After successful registration the user is already signed in (register + sign-in combined)
+      operationId: postAuthRegister
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Registration successful, session established
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "400":
+          description: Validation error (missing required field, password too short, invalid email format)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email address already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Registration failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/password-change:
+    post:
+      tags: [Authentication]
+      summary: Change credential (password)
+      description: |
+        Delegates to providers.auth.changePassword().
+
+        1. Verify session (401 if unauthenticated)
+        2. Accept CredentialChangeRequest (currentCredential / newCredential)
+        3. Call providers.auth.changePassword() — verifies current, validates and persists new
+        4. Return 200
+      operationId: postAuthPasswordChange
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialChangeRequest"
+      responses:
+        "200":
+          description: Credential changed successfully
+        "400":
+          description: Validation error (new credential too short)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthenticated or current credential mismatch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Change failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/signin:
+    post:
+      tags: [Authentication]
+      summary: Sign in with email and credential
+      description: |
+        Delegates to providers.auth.signin().
+
+        1. Accept SignInRequest (email / credential) — 400 if either is missing
+        2. Call providers.auth.signin() to verify the credential and establish the session
+        3. Load the account via Store.accounts.get() and return AccountProfile with 200
+
+        - Returns 401 with error "invalid_credential" when the email/credential pair does not match
+      operationId: postAuthSignin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignInRequest"
+      responses:
+        "200":
+          description: Sign-in successful, session established
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountProfile"
+        "400":
+          description: Missing email or credential
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Email/credential mismatch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Sign-in failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/signout:
+    post:
+      tags: [Authentication]
+      summary: Sign out the current session
+      description: |
+        1. Call providers.auth.signout() to clear the session
+        2. Return { ok: true } with 200
+      operationId: postAuthSignout
+      responses:
+        "200":
+          description: Sign-out successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "500":
+          description: Sign-out failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/player/auth/oauth/{provider}:
+    get:
+      tags: [Authentication]
+      summary: Begin OAuth sign-in for a provider
+      description: |
+        Vanity route that forwards to the Auth adapter's sign-in handler
+        (`/api/auth/signin/{provider}`) via providers.auth.handlers. The adapter
+        responds with a redirect to the external provider's authorization endpoint.
+      operationId: getPlayerOauthSignin
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+          description: OAuth provider id (e.g. "google")
+      responses:
+        "302":
+          description: Redirect to the external OAuth provider's authorization endpoint
+    post:
+      tags: [Authentication]
+      summary: Begin OAuth sign-in for a provider (form POST)
+      description: |
+        Same as GET, but forwards a form POST to the Auth adapter's sign-in handler
+        (`/api/auth/signin/{provider}`).
+      operationId: postPlayerOauthSignin
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+          description: OAuth provider id (e.g. "google")
+      responses:
+        "302":
+          description: Redirect to the external OAuth provider's authorization endpoint
+
+  /api/player/auth/oauth/callback/{provider}:
+    get:
+      tags: [Authentication]
+      summary: OAuth callback (legacy vanity URL)
+      description: |
+        Legacy vanity URL. Forwards the incoming query string to the Auth.js
+        callback handler at `/api/auth/callback/{provider}` via an HTTP redirect.
+      operationId: getPlayerOauthCallback
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+          description: OAuth provider id (e.g. "google")
+      responses:
+        "307":
+          description: Redirect to the Auth.js callback handler
+
+  # -- Gameplay ----------------------------------------------------
+  # During the MVP period with AUTH_PROVIDER=none, these endpoints
+  # are accessible without authentication.
+  # Authentication (security) will be added after AuthProvider is introduced.
+
+  /api/player/setup:
+    post:
+      tags: [Scenario setup]
+      summary: Generate a scenario instance
+      description: |
+        1. No request body. The server assembles prompts from prompts/
+        2. Call AIProvider to generate a scenario instance
+        3. Return SetupResponse (project / scenario / briefing / documents / stakeholders) with 200
+
+        - rootCause is included in SetupResponse but is not sent to the client
+        - Roles are fixed (one each of user_dept / manager / dev_member)
+      operationId: postSetup
+      responses:
+        "200":
+          description: Setup complete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupResponse"
+        "500":
+          description: AI generation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/player/scenarios:
+    get:
+      tags: [Scenario setup]
+      summary: List scenarios
+      description: |
+        1. Call Store
+        2. Return ScenarioSummary[] with 200
+      operationId: getScenarios
+      responses:
+        "200":
+          description: Scenario list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScenarioSummary"
+        "500":
+          description: Store retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/player/scenarios/{id}:
+    get:
+      tags: [Scenario setup]
+      summary: Get scenario details
+      description: |
+        1. Extract id from the path parameter
+        2. Call Store with id
+        3. Return 404 if not found; otherwise return StoredScenario with 200
+      operationId: getScenarioById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Scenario details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoredScenario"
+        "404":
+          description: Scenario not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Store retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/player/session-issuance:
+    post:
+      tags: [Session issuance]
+      summary: Issue a Realtime session bundle
+      description: |
+        1. Receive a RealtimeSessionRequest (stakeholderId / project / stakeholders / documents / callLogs)
+        2. Assemble the system prompt server-side (common_base + role-specific + conversation memory + cross-stakeholder dossier)
+        3. Call VoiceProvider ({ instructions, voice, tools })
+        4. Return RealtimeSessionResponse (value / model / sessionUpdate) with 200
+
+        - Internal state such as rootCause is baked into the prompt but not sent to the client
+        - The ephemeral key (value) is short-lived. The client uses it to connect directly to the OpenAI Realtime API
+      operationId: postRealtimeSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RealtimeSessionRequest"
+      responses:
+        "200":
+          description: Ephemeral key and session.update
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RealtimeSessionResponse"
+        "400":
+          description: Bad request (missing required field or stakeholderId mismatch)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Voice Provider call failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/player/tool-execution:
+    post:
+      tags: [Tool execution]
+      summary: Generate a document (tool execution)
+      description: |
+        1. Receive a DocumentRequest (project / stakeholders / request)
+        2. Call AIProvider(documentPrompt)
+        3. Return GeneratedDocument (title / body) with 200
+
+        - Invoked via a tool call from dev_member during a voice dialogue
+        - The timer animation is handled client-side. This endpoint only handles generation
+      operationId: postDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocumentRequest"
+      responses:
+        "200":
+          description: Generated document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratedDocument"
+        "500":
+          description: AI generation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/player/evaluation:
+    post:
+      tags: [Evaluation]
+      summary: Generate an overall evaluation and save the result
+      description: |
+        1. Receive an EvaluateRequest (project / stakeholders / callLogs)
+        2. Call AIProvider(evaluatePrompt)
+        3. Obtain ScoreResult (score / headline / good / improvements / comment)
+        4. Call Store.results.save() to persist the result (the evaluation response is returned even if persistence fails)
+        5. Return ScoreResult with 200
+      operationId: postEvaluate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluateRequest"
+      responses:
+        "200":
+          description: Evaluation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreResult"
+        "500":
+          description: AI generation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/player/results:
+    get:
+      tags: [Results query]
+      summary: List past results for the current user
+      description: |
+        1. Verify the session via SessionCookie (return 401 if unauthenticated)
+        2. Call Store.results.findByAccountId(accountId)
+        3. Return StoredResult[] with 200
+      operationId: getResults
+      security:
+        - SessionCookie: []
+      responses:
+        "200":
+          description: Results list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StoredResult"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Store retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/player/account:
+    get:
+      tags: [Account settings]
+      summary: Get account settings
+      description: |
+        1. Verify the session via SessionCookie (return 401 if unauthenticated)
+        2. Obtain the account ID via AuthProvider.getPrincipal()
+        3. Call Store.accounts.get(id)
+        4. Return AccountProfile (id / email / username / role) with 200
+      operationId: getAccount
+      security:
+        - SessionCookie: []
+      responses:
+        "200":
+          description: Account settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountProfile"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Account settings]
+      summary: Update account settings
+      description: |
+        1. Verify the session via SessionCookie (return 401 if unauthenticated)
+        2. Receive an AccountUpdateRequest (username)
+        3. Call Store.accounts.update(id, fields)
+        4. Return the updated AccountProfile with 200
+      operationId: postAccount
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountUpdateRequest"
+      responses:
+        "200":
+          description: Updated account settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountProfile"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Update failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/player/tickets:
+    get:
+      tags: [Tickets]
+      summary: Get the current user's ticket snapshot
+      description: |
+        1. Obtain the principal via providers.auth.getPrincipal()
+        2. Return 401 (error "unauthenticated") if the principal is anonymous
+        3. Sync any owed grants, then compute the snapshot via getTicketSnapshot()
+        4. Return TicketSnapshot (balance / nextGrantAt / ledger) with 200
+
+        - ledger holds up to the 20 most recent ticket rows
+      operationId: getPlayerTickets
+      security:
+        - SessionCookie: []
+      responses:
+        "200":
+          description: Ticket snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketSnapshot"
+        "401":
+          description: Unauthenticated (anonymous principal)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: authjs.session-token
+      description: Provider-managed HttpOnly session cookie set on sign-in.
+  schemas:
+    # -- Auth schemas ----------------------------------------------
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    RegisterRequest:
+      type: object
+      required: [email, credential]
+      properties:
+        email:
+          type: string
+          format: email
+        credential:
+          type: string
+          minLength: 8
+          description: Credential (hashed and stored by the adapter)
+        username:
+          type: string
+          description: Username (defaults to the local part of the email address)
+
+    CredentialChangeRequest:
+      type: object
+      required: [currentCredential, newCredential]
+      properties:
+        currentCredential:
+          type: string
+          description: Current credential (for identity verification)
+        newCredential:
+          type: string
+          minLength: 8
+          description: New credential (hashed and stored by the adapter)
+
+    AuthResult:
+      type: object
+      required: [id, role]
+      properties:
+        id:
+          type: string
+          description: Account ID
+        role:
+          type: string
+          enum: [player, admin]
+
+    AccountProfile:
+      type: object
+      required: [id, email, username, role]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        role:
+          type: string
+          enum: [player, admin]
+
+    AccountUpdateRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Username
+
+    SignInRequest:
+      type: object
+      required: [email, credential]
+      properties:
+        email:
+          type: string
+          format: email
+        credential:
+          type: string
+          description: Credential (verified by the adapter)
+
+    OkResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+
+    # -- Gameplay schemas (from Provider layer) --------------------
+
+    Scenario:
+      type: object
+      required: [domain, metric, edgeCase, gapLocation, userAwareness]
+      properties:
+        domain:
+          type: string
+        metric:
+          type: string
+        edgeCase:
+          type: string
+        gapLocation:
+          type: string
+          enum: [business, functional]
+        userAwareness:
+          type: string
+          enum: [aware, unaware]
+
+    Briefing:
+      type: object
+      required: [overview, trouble]
+      properties:
+        overview:
+          type: string
+        trouble:
+          type: string
+
+    SetupProject:
+      type: object
+      required: [title, situation, rootCause]
+      properties:
+        title:
+          type: string
+        situation:
+          type: string
+        rootCause:
+          type: string
+
+    SetupDocument:
+      type: object
+      required: [title, body]
+      properties:
+        title:
+          type: string
+        body:
+          type: string
+        kind:
+          type: string
+
+    SetupStakeholder:
+      type: object
+      required:
+        [
+          role,
+          name,
+          company,
+          situation,
+          relationToRootCause,
+          persona,
+          goal,
+          moodStart,
+          openingInstruction,
+        ]
+      properties:
+        role:
+          type: string
+          enum: [user_dept, manager, dev_member]
+        name:
+          type: string
+        company:
+          type: string
+        situation:
+          type: string
+        relationToRootCause:
+          type: string
+          enum: [unaware, partial, hiding]
+        persona:
+          type: string
+        goal:
+          type: string
+        moodStart:
+          type: number
+        openingInstruction:
+          type: string
+
+    SetupResponse:
+      type: object
+      required: [project, scenario, briefing, documents, stakeholders]
+      properties:
+        project:
+          $ref: "#/components/schemas/SetupProject"
+        scenario:
+          $ref: "#/components/schemas/Scenario"
+        briefing:
+          $ref: "#/components/schemas/Briefing"
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/SetupDocument"
+        stakeholders:
+          type: array
+          items:
+            $ref: "#/components/schemas/SetupStakeholder"
+
+    Project:
+      type: object
+      required: [title, situation, rootCause, scenario, documents, briefing]
+      properties:
+        title:
+          type: string
+        situation:
+          type: string
+        rootCause:
+          type: string
+        scenario:
+          $ref: "#/components/schemas/Scenario"
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/Doc"
+        briefing:
+          $ref: "#/components/schemas/Briefing"
+
+    Doc:
+      type: object
+      required: [id, title, body, source]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        source:
+          type: string
+          enum: [initial, generated]
+
+    Stakeholder:
+      type: object
+      required:
+        [
+          id,
+          name,
+          role,
+          company,
+          situation,
+          relationToRootCause,
+          persona,
+          goal,
+          moodStart,
+          openingInstruction,
+        ]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [user_dept, manager, dev_member]
+        company:
+          type: string
+        situation:
+          type: string
+        relationToRootCause:
+          type: string
+          enum: [unaware, partial, hiding]
+        persona:
+          type: string
+        goal:
+          type: string
+        moodStart:
+          type: number
+        openingInstruction:
+          type: string
+
+    CallTurn:
+      type: object
+      required: [role, text]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        text:
+          type: string
+
+    CallLogs:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          $ref: "#/components/schemas/CallTurn"
+
+    DocumentRequest:
+      type: object
+      required: [project, stakeholders, request]
+      properties:
+        project:
+          $ref: "#/components/schemas/Project"
+        stakeholders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Stakeholder"
+        request:
+          type: string
+
+    GeneratedDocument:
+      type: object
+      required: [title, body]
+      properties:
+        title:
+          type: string
+        body:
+          type: string
+
+    EvaluateRequest:
+      type: object
+      required: [project, stakeholders, callLogs]
+      properties:
+        project:
+          $ref: "#/components/schemas/Project"
+        stakeholders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Stakeholder"
+        callLogs:
+          $ref: "#/components/schemas/CallLogs"
+
+    ScoreResult:
+      type: object
+      required: [score, headline, good, improvements, comment]
+      properties:
+        score:
+          type: number
+        headline:
+          type: string
+        good:
+          type: array
+          items:
+            type: string
+        improvements:
+          type: array
+          items:
+            type: string
+        comment:
+          type: string
+
+    RealtimeSessionRequest:
+      type: object
+      required: [stakeholderId, project, stakeholders, documents, callLogs]
+      properties:
+        stakeholderId:
+          type: string
+        project:
+          $ref: "#/components/schemas/Project"
+        stakeholders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Stakeholder"
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/Doc"
+        callLogs:
+          $ref: "#/components/schemas/CallLogs"
+
+    RealtimeSessionResponse:
+      type: object
+      required: [value, model, sessionUpdate]
+      properties:
+        value:
+          type: string
+        model:
+          type: string
+        sessionUpdate:
+          type: object
+          additionalProperties: true
+
+    ScenarioSummary:
+      type: object
+      required: [id, title, situation, updatedAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        situation:
+          type: string
+        updatedAt:
+          type: string
+
+    ScenarioRoleStored:
+      type: object
+      required:
+        [
+          id,
+          scenarioId,
+          role,
+          name,
+          company,
+          situation,
+          relationToRootCause,
+          persona,
+          goal,
+          moodStart,
+          openingInstruction,
+        ]
+      properties:
+        id:
+          type: string
+        scenarioId:
+          type: string
+        role:
+          type: string
+        name:
+          type: string
+        company:
+          type: string
+        situation:
+          type: string
+        relationToRootCause:
+          type: string
+          enum: [unaware, partial, hiding]
+        persona:
+          type: string
+        goal:
+          type: string
+        moodStart:
+          type: number
+        openingInstruction:
+          type: string
+
+    ScenarioDocumentStored:
+      type: object
+      required: [id, scenarioId, title, body]
+      properties:
+        id:
+          type: string
+        scenarioId:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        kind:
+          type: string
+
+    RubricItemStored:
+      type: object
+      required: [id, scenarioId, label, weight]
+      properties:
+        id:
+          type: string
+        scenarioId:
+          type: string
+        label:
+          type: string
+        weight:
+          type: number
+
+    StoredScenario:
+      type: object
+      required:
+        [
+          id,
+          title,
+          situation,
+          rootCause,
+          domain,
+          metric,
+          edgeCase,
+          gapLocation,
+          userAwareness,
+          briefingOverview,
+          briefingTrouble,
+          roles,
+          documents,
+          rubricItems,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        situation:
+          type: string
+        rootCause:
+          type: string
+        domain:
+          type: string
+        metric:
+          type: string
+        edgeCase:
+          type: string
+        gapLocation:
+          type: string
+          enum: [business, functional]
+        userAwareness:
+          type: string
+          enum: [aware, unaware]
+        briefingOverview:
+          type: string
+        briefingTrouble:
+          type: string
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScenarioRoleStored"
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScenarioDocumentStored"
+        rubricItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/RubricItemStored"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    StoredResult:
+      type: object
+      required:
+        [
+          id,
+          accountId,
+          scenarioId,
+          score,
+          headline,
+          goodJson,
+          improvementsJson,
+          createdAt,
+        ]
+      properties:
+        id:
+          type: string
+        accountId:
+          type: string
+          nullable: true
+        scenarioId:
+          type: string
+        score:
+          type: number
+        headline:
+          type: string
+        goodJson:
+          type: string
+        improvementsJson:
+          type: string
+        createdAt:
+          type: string
+
+    TicketLedger:
+      type: object
+      required:
+        [
+          id,
+          accountId,
+          type,
+          isActive,
+          consumedAt,
+          consumedScenarioId,
+          revokedAt,
+          createdAt,
+        ]
+      properties:
+        id:
+          type: string
+        accountId:
+          type: string
+        type:
+          type: string
+          enum: [registration_grant, monthly_grant, purchase, admin_adjust]
+        isActive:
+          type: boolean
+        consumedAt:
+          type: string
+          nullable: true
+          description: ISO timestamp when the ticket was consumed, or null if unused
+        consumedScenarioId:
+          type: string
+          nullable: true
+          description: Scenario id the ticket was spent on, or null if unused
+        revokedAt:
+          type: string
+          nullable: true
+          description: ISO timestamp when the ticket was revoked by an admin, or null
+        createdAt:
+          type: string
+
+    TicketSnapshot:
+      type: object
+      required: [balance, nextGrantAt, ledger]
+      properties:
+        balance:
+          type: integer
+          description: Count of currently active (unconsumed, non-revoked) tickets
+        nextGrantAt:
+          type: string
+          description: ISO timestamp of the next scheduled grant
+        ledger:
+          type: array
+          items:
+            $ref: "#/components/schemas/TicketLedger"
+          description: Up to the 20 most recent ticket rows

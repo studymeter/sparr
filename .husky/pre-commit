@@ -1,0 +1,5 @@
+echo ">>> [pre-commit] 型チェック..."
+npm run typecheck || { echo "ERROR: 型エラー。コミットを中止します。"; exit 1; }
+echo ">>> [pre-commit] Lint..."
+npm run lint || { echo "ERROR: Lintエラー。コミットを中止します。"; exit 1; }
+echo ">>> [pre-commit] OK"

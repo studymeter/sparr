@@ -1,0 +1,22 @@
+---
+description: app/api サーバルートのセキュリティ境界
+globs: app/api/**
+alwaysApply: false
+---
+
+# 役割
+
+`app/api/**` はサーバのみ。OpenAI 標準キーの読み取りと ephemeral key 発行はここに置く。
+
+# 必須パターン
+
+- 標準キーはサーバ環境変数（例: OPENAI_API_KEY）からのみ参照
+- クライアントへ返すのは ephemeral key のみ。標準キーをレスポンスに含めない
+- エラーメッセージに秘密や内部スタックを漏らさない
+
+# 禁止
+
+- このルートの処理をクライアントコンポーネントへ移す
+- NEXT_PUBLIC_ 経由で鍵を公開する
+
+詳細は `CLAUDE.md` と `docs/architecture/` を参照。

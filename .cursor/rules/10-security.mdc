@@ -1,0 +1,34 @@
+---
+description: セキュリティ要件（不可侵）
+alwaysApply: true
+---
+
+# 正本
+
+詳細は `CLAUDE.md` の「セキュリティ要件」節。ここは行動チェックリスト。
+
+# 秘密情報
+
+- OpenAI 標準APIキーはサーバのみ。クライアントは ephemeral key のみ
+- `NEXT_PUBLIC_` に鍵・トークン・シークレットを置かない
+- 秘密をコードにハードコードしない。`.env.local` に置き、`.env.example` には鍵名だけ
+- `.env` / `.env.local` を編集・コミットしない
+
+# サーバ境界
+
+- 秘密を扱う処理は `app/api/**` に置く
+- `"use client"` から標準キーやサーバ用 `process.env` に触れない
+
+# 依存・入力
+
+- 追加は npm のみ。許容ライセンス: MIT / BSD / Apache-2.0 / ISC
+- high 以上の既知脆弱性を持つ依存を入れない
+- ユーザー入力・モデル出力は信頼しない。`eval` / `dangerouslySetInnerHTML` 等に流さない
+
+# 強制の多層防御
+
+- `.cursor/hooks/*` … ローカル早期ブロック（Cursor）
+- `.claude/hooks/*` … ローカル早期ブロック（Claude Code）
+- `.github/workflows/security.yml` … PRマージの最終ゲート（全ツール共通）
+
+フック・CIの無効化・`git commit --no-verify` は禁止。必要なら人間に確認する。

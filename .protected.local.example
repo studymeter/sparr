@@ -1,0 +1,24 @@
+# .protected.local — paths the AI must NOT touch (OPT-IN, gitignored).
+#
+# Copy this file to `.protected.local` to lock paths against AI edits. While
+# `.protected.local` exists, the Claude Code / Cursor guard BLOCKS Edit/Write
+# to any path listed below — and to `.protected.local` itself. To change what
+# is protected, edit `.protected.local` by hand; the AI cannot. Delete the file
+# to lift all restrictions.
+#
+# Notes
+# - One repo-relative glob per line. Blank lines and lines starting with # ignored.
+# - A bare directory matches everything beneath it. `*` matches within a path
+#   segment; `**` matches across segments.
+# - Convenience fence, not a security control: a human can edit or remove this
+#   file. The hard guarantee is server-side branch protection.
+#
+# Suggested defaults — the security/config surface the AI should not edit
+# (uncomment what you want to lock):
+# .claude/
+# .cursor/hooks/
+# .cursor/hooks.json
+# .github/workflows/
+# .husky/
+# CLAUDE.md
+# SECURITY.md

@@ -1,0 +1,190 @@
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    RegisterRequest:
+      type: object
+      required: [email, credential]
+      properties:
+        email:
+          type: string
+          format: email
+        credential:
+          type: string
+          minLength: 8
+        username:
+          type: string
+
+    CredentialChangeRequest:
+      type: object
+      required: [currentCredential, newCredential]
+      properties:
+        currentCredential:
+          type: string
+        newCredential:
+          type: string
+          minLength: 8
+
+    AuthResult:
+      type: object
+      required: [id, role]
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+          enum: [player, admin]
+
+    SessionInfo:
+      type: object
+      required: [id, role, email, username]
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+          enum: [player, admin]
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+
+    AccountProfile:
+      type: object
+      required: [id, role, email, username]
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+          enum: [player, admin]
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+
+    AccountUpdateRequest:
+      type: object
+      properties:
+        username:
+          type: string
+
+    StoredScenario:
+      type: object
+      required: [id, basePrompt, challengePrompt, documentsPrompt, rubricPrompt]
+      properties:
+        id:
+          type: string
+        basePrompt:
+          type: string
+        challengePrompt:
+          type: string
+        documentsPrompt:
+          type: string
+        rubricPrompt:
+          type: string
+
+    StoredPersona:
+      type: object
+      required:
+        [
+          id,
+          scenarioId,
+          characterPrompt,
+          voiceCode,
+          docToolEnabled,
+        ]
+      properties:
+        id:
+          type: string
+        scenarioId:
+          type: string
+        characterPrompt:
+          type: string
+        voiceCode:
+          type: string
+        docToolEnabled:
+          type: boolean
+
+    StoredResult:
+      type: object
+      required: [id, accountId, scenarioId, summary, evaluation]
+      properties:
+        id:
+          type: string
+        accountId:
+          type: string
+          nullable: true
+        scenarioId:
+          type: string
+        summary:
+          type: string
+        evaluation:
+          type: string
+
+    ScenarioCreateRequest:
+      type: object
+      required: [id, basePrompt, challengePrompt, documentsPrompt, rubricPrompt]
+      properties:
+        id:
+          type: string
+        basePrompt:
+          type: string
+        challengePrompt:
+          type: string
+        documentsPrompt:
+          type: string
+        rubricPrompt:
+          type: string
+        personas:
+          type: array
+          items:
+            $ref: "#/components/schemas/StoredPersona"
+
+    ScenarioUpdateRequest:
+      type: object
+      properties:
+        basePrompt:
+          type: string
+        challengePrompt:
+          type: string
+        documentsPrompt:
+          type: string
+        rubricPrompt:
+          type: string
+        personas:
+          type: array
+          items:
+            $ref: "#/components/schemas/StoredPersona"
+
+    AdminUserCreateRequest:
+      type: object
+      required: [email, credential, role]
+      properties:
+        email:
+          type: string
+          format: email
+        credential:
+          type: string
+          minLength: 8
+        username:
+          type: string
+        role:
+          type: string
+          enum: [player, admin]
+
+    AdminUserUpdateRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        role:
+          type: string
+          enum: [player, admin]

@@ -1,0 +1,1824 @@
+openapi: 3.1.0
+info:
+  title: Sparr Admin Endpoints
+  version: 1.0.0
+  description: |
+    Admin endpoint specification. Corresponds to the Admin Endpoint definition in `docs/architecture/components.md`.
+
+    ## Authentication
+
+    Auth routes (sign-in / sign-out / OAuth callbacks) are provided by the Auth adapter at
+    `app/api/auth/[...auth]` (framework-managed via `providers.auth.handlers` delegation).
+    The concrete URL scheme is adapter-defined and is not specified in this document.
+
+    Business endpoints assume an authenticated principal via `getPrincipal()` and do not own
+    sign-in or sign-out flows. `role=admin` is enforced per-route via `requireAdmin()` —
+    not by individual endpoint sign-in logic.
+
+    CSRF protection relies on the SameSite cookie policy (Auth.js-independent);
+    no X-CSRF-Token header is required.
+
+    All /api/admin/** paths require role=admin enforced per-route via requireAdmin().
+    Operations touch ACCOUNT / SCENARIO / PERSONA / RESULT / SETTING via the Store.
+    Player endpoints (`/api/player/**`) are documented in `./openapi.yaml`.
+
+servers:
+  - url: http://localhost:3000
+    description: Local dev
+tags:
+  - name: Auth
+    description: Account registration and credential management (via providers.auth)
+  - name: Account
+    description: Admin account profile management (via Store)
+  - name: Dashboard
+    description: Dashboard aggregation (via Store)
+  - name: Users
+    description: User management (via Store)
+  - name: Tickets
+    description: Per-user ticket balance management (via Store)
+  - name: Scenarios
+    description: Scenario management (via Store)
+  - name: Settings
+    description: System settings management (via Store)
+
+paths:
+
+  # ── Auth ──────────────────────────────────────────────
+  # Sign-in / sign-out / session are framework-managed by the Auth adapter at
+  # app/api/auth/[...auth] (providers.auth.handlers delegation). The concrete URL
+  # scheme is adapter-defined and is not specified here.
+  # Business endpoints below this section assume an authenticated principal via
+  # getPrincipal(). role=admin is enforced per-route via requireAdmin().
+  #
+  # OAuth link/unlink: omitted for now (initial Google-only scope).
+  # Add via Store.oauthAccounts when the account-linking UI is introduced.
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new account
+      description: |
+        Delegates to `providers.auth.register()`.
+
+        1. Accept RegisterRequest (email / credential / username?)
+        2. Call providers.auth.register() — validates input, checks for duplicate email,
+           and persists the new account
+        3. Return the created AccountProfile with 201
+
+        Not admin-only: used for self-registration (players) and admin-initiated account
+        creation when the Auth.js adapter is active.
+      operationId: postAuthRegister
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountProfile"
+        "400":
+          description: Validation error (missing required field, credential too short, invalid email format)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email address already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Registration failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/password-change:
+    post:
+      tags: [Auth]
+      summary: Change the authenticated user's credential
+      description: |
+        Delegates to `providers.auth.changePassword()`.
+
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Accept CredentialChangeRequest (currentCredential / newCredential)
+        3. Call providers.auth.changePassword() — verifies currentCredential (401 if mismatch),
+           validates newCredential (min 8 characters), and persists it
+        4. Return 200
+      operationId: postAuthPasswordChange
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialChangeRequest"
+      responses:
+        "200":
+          description: Credential changed successfully
+        "400":
+          description: Validation error (e.g. new credential too short)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthenticated or current credential mismatch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Change failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/admin/auth/oauth/{provider}:
+    get:
+      tags: [Auth]
+      summary: Begin admin OAuth sign-in for a provider
+      description: |
+        Vanity route that forwards to the Auth adapter's sign-in handler
+        (`/api/auth/signin/{provider}`) via providers.auth.handlers. The adapter
+        responds with a redirect to the external provider's authorization endpoint.
+        The callbackUrl query parameter defaults to `/admin` when omitted.
+      operationId: getAdminOauthSignin
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+          description: OAuth provider id (e.g. "google")
+        - name: callbackUrl
+          in: query
+          required: false
+          schema:
+            type: string
+            default: /admin
+          description: Post-sign-in redirect target (defaults to /admin)
+      responses:
+        "302":
+          description: Redirect to the external OAuth provider's authorization endpoint
+    post:
+      tags: [Auth]
+      summary: Begin admin OAuth sign-in for a provider (form POST)
+      description: |
+        Same as GET, but forwards a form POST to the Auth adapter's sign-in handler
+        (`/api/auth/signin/{provider}`). The callbackUrl query parameter defaults to
+        `/admin` when omitted.
+      operationId: postAdminOauthSignin
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+          description: OAuth provider id (e.g. "google")
+        - name: callbackUrl
+          in: query
+          required: false
+          schema:
+            type: string
+            default: /admin
+          description: Post-sign-in redirect target (defaults to /admin)
+      responses:
+        "302":
+          description: Redirect to the external OAuth provider's authorization endpoint
+
+  # ── Account ──────────────────────────────────────────
+  # Admin's own profile management.
+
+  /api/admin/account:
+    get:
+      tags: [Account]
+      summary: Get admin's own account settings
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Retrieve account ID via getPrincipal()
+        4. Call Store.accounts.get(id)
+        5. Return AccountProfile (id / email / username / role) with 200
+
+      operationId: getAdminAccount
+      security:
+        - SessionCookie: []
+      responses:
+        "200":
+          description: Account settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountProfile"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Account]
+      summary: Update admin's own account settings
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Accept AccountUpdateRequest (username)
+        4. Call Store.accounts.update(id, fields)
+        5. Return updated AccountProfile with 200
+      operationId: postAdminAccount
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountUpdateRequest"
+      responses:
+        "200":
+          description: Updated account settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountProfile"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Update failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Dashboard ──────────────────────────────────────────
+  # Aggregate counts and recent results from the Store.
+
+  /api/admin/dashboard:
+    get:
+      tags: [Dashboard]
+      summary: Get dashboard aggregation data
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Fetch the following from the Store:
+           - Store.accounts.list() → totalUsers
+           - Store.scenarios.list() → totalScenarios
+           - Store.results.count() → totalResults
+           - Store.results.listRecent(20) → recentResults
+        4. Join each recentResults entry with the fetched accounts/scenarios to
+           attach scenarioTitle and accountUsername
+        5. Return DashboardStats with 200
+
+      operationId: getAdminDashboard
+      security:
+        - SessionCookie: []
+      responses:
+        "200":
+          description: Dashboard aggregation data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Store retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Users ──────────────────────────────────────────────
+  # CRUD on the ACCOUNT table.
+
+  /api/admin/users:
+    get:
+      tags: [Users]
+      summary: List users
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Build filter from query parameters (role / q)
+        4. Call Store.accounts.list(filter)
+        5. Return AdminUserSummary[] with 200
+
+      operationId: getAdminUsers
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: role
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [player, admin]
+          description: Filter by role
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Partial-match filter on email or username
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminUserSummary"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Store retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Users]
+      summary: Create a user
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Accept AdminUserCreateRequest (email / credential / username? / role)
+        4. Call providers.auth.register() to validate, check for duplicates, and persist the new account
+        5. Return the created AdminUserSummary with 201
+
+      operationId: postAdminUsers
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUserCreateRequest"
+      responses:
+        "201":
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserSummary"
+        "400":
+          description: Validation error (missing required field, credential too short, invalid email format)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email address already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Creation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/admin/users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user detail (including result history)
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Call Store.accounts.get(id) (404 if not found)
+        4. Call Store.results.listByAccount(id) and Store.scenarios.list(),
+           then join each result with its scenario to attach scenarioTitle
+        5. Return AdminUserDetail (profile + results[]) with 200
+
+      operationId: getAdminUserById
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: User account ID
+      responses:
+        "200":
+          description: User detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Store retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Users]
+      summary: Update user info
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Accept AdminUserUpdateRequest (username? / role?)
+        4. If attempting to change own role, return 400 (lockout prevention)
+        5. Call Store.accounts.update(id, fields) (404 if not found)
+        6. Return updated AdminUserSummary with 200
+      operationId: patchAdminUserById
+
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: User account ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUserUpdateRequest"
+      responses:
+        "200":
+          description: Updated user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserSummary"
+        "400":
+          description: Validation error or attempt to change own role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Update failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Users]
+      summary: Delete a user
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. If attempting to delete own account, return 400 (lockout prevention)
+        4. Call Store.accounts.delete(id) (404 if not found)
+        5. Return 204
+
+      operationId: deleteAdminUserById
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: User account ID
+      responses:
+        "204":
+          description: Deletion successful
+        "400":
+          description: Attempt to delete own account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Deletion failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Tickets ────────────────────────────────────────────
+  # Manage a player's ticket ledger. All operations target role=player accounts.
+
+  /api/admin/users/{id}/tickets:
+    get:
+      tags: [Tickets]
+      summary: Get a user's ticket snapshot
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Look up the target account (404 "not_found" if it does not exist)
+        4. Return 400 "not_a_player" if the account is not a player
+        5. Return the TicketSnapshot (balance / nextGrantAt / ledger) with 200
+      operationId: getAdminUserTickets
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: User account ID
+      responses:
+        "200":
+          description: Ticket snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketSnapshot"
+        "400":
+          description: Target account is not a player (error "not_a_player")
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found (error "not_found")
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Store retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Tickets]
+      summary: Grant tickets to a user
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Accept TicketGrantRequest (count: integer 1..1000);
+           400 "invalid_request" if count is missing or out of range
+        4. Look up the target account (404 "not_found"); 400 "not_a_player" if not a player
+        5. Grant count admin_adjust tickets to the account
+        6. Return the updated TicketSnapshot with 201
+      operationId: postAdminUserTickets
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: User account ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketGrantRequest"
+      responses:
+        "201":
+          description: Tickets granted; updated snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketSnapshot"
+        "400":
+          description: Invalid count (error "invalid_request") or account is not a player (error "not_a_player")
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found (error "not_found")
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Grant failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Tickets]
+      summary: Revoke up to N active tickets from a user
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Accept TicketRevokeRequest (count: integer 1..1000);
+           400 "invalid_request" if count is missing or out of range
+        4. Look up the target account (404 "not_found"); 400 "not_a_player" if not a player
+        5. Logically revoke up to count active tickets, newest first; revoked tickets
+           remain in the ledger with revokedAt set and isActive false
+        6. Return the updated snapshot plus deletedCount (number of tickets revoked) with 200
+      operationId: deleteAdminUserTickets
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: User account ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketRevokeRequest"
+      responses:
+        "200":
+          description: Tickets revoked; updated snapshot with deletedCount
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketRevokeResult"
+        "400":
+          description: Invalid count (error "invalid_request") or account is not a player (error "not_a_player")
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found (error "not_found")
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Revoke failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/admin/users/{id}/tickets/{ticketId}:
+    delete:
+      tags: [Tickets]
+      summary: Revoke a single active ticket
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Look up the target account (404 "not_found"); 400 "not_a_player" if not a player
+        4. Locate the ticket by ticketId; 404 "not_found" if it does not exist or belongs to a different user
+        5. Return 400 "already_consumed" if the ticket is no longer active
+        6. Logically revoke the ticket (revokedAt set, isActive false) and return the updated TicketSnapshot with 200
+      operationId: deleteAdminUserTicketById
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: User account ID
+        - name: ticketId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Ticket ledger row ID
+      responses:
+        "200":
+          description: Ticket revoked; updated snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketSnapshot"
+        "400":
+          description: Ticket already inactive (error "already_consumed") or account is not a player (error "not_a_player")
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found, or ticket not found / owned by a different user (error "not_found")
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Revoke failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Scenarios ──────────────────────────────────────────
+  # CRUD on SCENARIO + PERSONA (the data model follows docs/architecture/data-model.md).
+
+  /api/admin/scenarios:
+    get:
+      tags: [Scenarios]
+      summary: List scenarios
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Call Store.scenarios.list()
+        4. Return AdminScenarioSummary[] with 200
+      operationId: getAdminScenarios
+      security:
+        - SessionCookie: []
+      responses:
+        "200":
+          description: Scenario list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminScenarioSummary"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Store retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Scenarios]
+      summary: Create a scenario
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Accept AdminScenarioCreateRequest (scenario body + optional personas[])
+        4. Assign a scenario id: use the provided id, or generate one (uid()) if omitted
+        5. Call Store.scenarios.create(scenario)
+        6. If personas[] provided, assign an id (uid()) to any persona missing one,
+           then call Store.personas.replaceAll(id, personas)
+        7. Return the created AdminScenarioDetail with 201
+      operationId: postAdminScenarios
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminScenarioCreateRequest"
+      responses:
+        "201":
+          description: Scenario created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminScenarioDetail"
+        "400":
+          description: Validation error (missing required field, invalid roles/documents/rubricItems, etc.)
+
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Creation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/admin/scenarios/{id}:
+    get:
+      tags: [Scenarios]
+      summary: Get scenario detail (including personas)
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Call Store.scenarios.get(id) (404 if not found)
+        4. Call Store.personas.findByScenarioId(id)
+        5. Return AdminScenarioDetail (scenario + personas[]) with 200
+      operationId: getAdminScenarioById
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Scenario ID
+      responses:
+        "200":
+          description: Scenario detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminScenarioDetail"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Scenario not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Store retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Scenarios]
+      summary: Update a scenario
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Accept AdminScenarioUpdateRequest (partial Scenario field updates + optional personas[])
+        4. Call Store.scenarios.update(id, fields) (404 if not found)
+        5. If personas[] provided, assign an id (uid()) to any persona missing one
+           (existing personas keep their id if included), then call
+           Store.personas.replaceAll(id, personas)
+        6. Return updated AdminScenarioDetail with 200
+      operationId: postAdminScenarioById
+
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Scenario ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminScenarioUpdateRequest"
+      responses:
+        "200":
+          description: Updated scenario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminScenarioDetail"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Scenario not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Update failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Scenarios]
+      summary: Delete a scenario
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Call Store.scenarios.delete(id) (404 if not found)
+        4. Return 200
+
+
+        - If a scenario referenced by existing RESULTs is deleted, the RESULTs remain but scenarioId becomes orphaned
+      operationId: deleteAdminScenarioById
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Scenario ID
+      responses:
+        "200":
+          description: Deletion successful
+
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Scenario not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Deletion failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/admin/scenarios/{id}/results:
+    get:
+      tags: [Scenarios]
+      summary: Get per-scenario grade summary across all users
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Call Store.scenarios.get(id) (404 if not found)
+        4. Call Store.results.listRecent() and filter to this scenario's RESULTs,
+           then join with Store.accounts.list() for email/username
+        5. Parse each RESULT's evaluation JSON to extract its score
+        6. Group by accountId (results with no accountId are grouped as one
+           anonymous bucket) and aggregate play count / average score / best score per user
+        7. Return AdminScenarioResultsSummary with 200
+
+        - Anonymous plays (accountId null) are aggregated into a single entry with
+          accountId/email/username all null.
+      operationId: getAdminScenarioResults
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Scenario ID
+      responses:
+        "200":
+          description: Per-scenario grade summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminScenarioResultsSummary"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Scenario not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Store retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Settings ──────────────────────────────────────────
+  # Read and write the SETTING table (key/value pairs).
+
+  /api/admin/settings:
+    get:
+      tags: [Settings]
+      summary: Get all system settings
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Call Store.settings.list()
+        4. Return SystemSetting[] with 200
+
+      operationId: getAdminSettings
+      security:
+        - SessionCookie: []
+      responses:
+        "200":
+          description: System settings list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SystemSetting"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Store retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Settings]
+      summary: Update system settings
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Accept SettingsUpdateRequest (settings[] or key/value map)
+        4. Call Store.settings.update(key, value) for each entry (upsert)
+        5. Return updated SystemSetting[] with 200
+
+        - Keys not included in the request are left unchanged (partial update)
+        - Keys that do not exist yet are created (upsert)
+      operationId: postAdminSettings
+
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsUpdateRequest"
+      responses:
+        "200":
+          description: All system settings after update
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SystemSetting"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Update failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/admin/settings/{key}:
+    delete:
+      tags: [Settings]
+      summary: Delete a single system setting
+      description: |
+        1. Verify session via SessionCookie (401 if unauthenticated)
+        2. Verify role=admin (403 if not admin)
+        3. Call Store.settings.get(key) (404 "not_found" if the key does not exist)
+        4. Call Store.settings.delete(key)
+        5. Return 204 (no content)
+      operationId: deleteAdminSettingByKey
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Setting key
+      responses:
+        "204":
+          description: Setting deleted
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Setting not found (error "not_found")
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Deletion failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: authjs.session-token
+      description: |
+        Session cookie set by the Auth adapter on sign-in. Sent automatically by the browser
+        for same-origin requests. CSRF protection relies on the SameSite cookie policy —
+        no separate X-CSRF-Token header is required.
+
+  schemas:
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    # ── Auth / Account ────────────────────────────────────
+
+    RegisterRequest:
+      type: object
+      required: [email, credential]
+      properties:
+        email:
+          type: string
+          format: email
+        credential:
+          type: string
+          minLength: 8
+          description: Initial credential (min 8 characters)
+        username:
+          type: string
+          description: Username (defaults to the local part of the email if omitted)
+
+    CredentialChangeRequest:
+      type: object
+      required: [currentCredential, newCredential]
+      properties:
+        currentCredential:
+          type: string
+          description: Current credential for identity verification
+        newCredential:
+          type: string
+          minLength: 8
+          description: New credential (min 8 characters)
+
+    SessionInfo:
+      type: object
+      required: [id, role, email, username]
+      properties:
+        id:
+          type: string
+          description: Account ID
+        role:
+          type: string
+          enum: [player, admin]
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+
+    AccountProfile:
+      type: object
+      required: [id, role, email, username]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        role:
+          type: string
+          enum: [player, admin]
+
+    AccountUpdateRequest:
+      type: object
+      properties:
+        username:
+          type: string
+
+    # ── Dashboard ─────────────────────────────────────────
+
+    RecentResultSummary:
+      type: object
+      required: [id, scenarioId, score, headline, createdAt]
+      properties:
+        id:
+          type: string
+        accountId:
+          type: [string, "null"]
+        accountEmail:
+          type: [string, "null"]
+          description: |
+            Email address from a joined account lookup. "null" for anonymous plays
+            (accountId is "null") or a deleted account. UI fallback label when
+            accountUsername is "null": accountEmail, then "—".
+        accountUsername:
+          type: [string, "null"]
+          description: |
+            Display name from a joined account lookup. "null" if the account has
+            no username set (blanked out via admin edit), or for anonymous plays
+            / a deleted account.
+
+        scenarioId:
+          type: string
+        scenarioTitle:
+          type: string
+          description: Scenario title from a joined scenario lookup (falls back to scenarioId if the title is unset)
+        score:
+          type: number
+        headline:
+          type: string
+        createdAt:
+          type: string
+
+    DashboardStats:
+      type: object
+      required: [totalUsers, totalScenarios, totalResults, recentResults]
+      properties:
+        totalUsers:
+          type: integer
+          description: Total account count
+        totalScenarios:
+          type: integer
+          description: Total scenario count
+        totalResults:
+          type: integer
+          description: Total play count
+        recentResults:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecentResultSummary"
+          description: Latest 20 results
+
+    # ── Users ─────────────────────────────────────────────
+
+    AdminUserSummary:
+      type: object
+      required: [id, email, role, username]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        role:
+          type: string
+          enum: [player, admin]
+
+    AdminUserDetail:
+      type: object
+      required: [id, email, role, username, results]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        role:
+          type: string
+          enum: [player, admin]
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecentResultSummary"
+          description: Full result history for this user
+
+    AdminUserCreateRequest:
+      type: object
+      required: [email, credential, role]
+      properties:
+        email:
+          type: string
+          format: email
+        credential:
+          type: string
+          minLength: 8
+          description: Initial credential (min 8 characters)
+        username:
+          type: string
+          description: Username (defaults to the local part of the email if omitted)
+        role:
+          type: string
+          enum: [player, admin]
+
+    AdminUserUpdateRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        role:
+          type: string
+          enum: [player, admin]
+          description: Cannot change own role (returns 400)
+
+    # ── Scenarios ─────────────────────────────────────────
+    # Mirrors docs/architecture/data-model.md: SCENARIO + PERSONA tables.
+
+    AdminPersona:
+      type: object
+      required: [id, scenarioId, characterPrompt, voiceCode, docToolEnabled]
+      properties:
+        id:
+          type: string
+        scenarioId:
+          type: string
+        characterPrompt:
+          type: string
+        voiceCode:
+          type: string
+        docToolEnabled:
+          type: boolean
+
+    AdminPersonaInput:
+      type: object
+      required: [characterPrompt, voiceCode, docToolEnabled]
+      properties:
+        id:
+          type: string
+          description: |
+            Omit to auto-generate a new persona ID (uid()). When updating a scenario,
+            include the existing id to keep that persona's id stable; personas omitted
+            from the array are removed (replaceAll semantics).
+        characterPrompt:
+          type: string
+        voiceCode:
+          type: string
+        docToolEnabled:
+          type: boolean
+
+    AdminScenarioSummary:
+      type: object
+      required: [id, title, challengePrompt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        challengePrompt:
+          type: string
+
+    AdminScenarioDetail:
+      type: object
+      required: [id, basePrompt, challengePrompt, documentsPrompt, rubricPrompt, personas]
+      properties:
+        id:
+          type: string
+        basePrompt:
+          type: string
+        challengePrompt:
+          type: string
+        documentsPrompt:
+          type: string
+        rubricPrompt:
+          type: string
+        personas:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminPersona"
+
+    AdminScenarioCreateRequest:
+      type: object
+      required: [basePrompt, challengePrompt, documentsPrompt, rubricPrompt]
+      properties:
+        id:
+          type: string
+          description: Omit to auto-generate a new scenario ID (uid()).
+        basePrompt:
+          type: string
+        challengePrompt:
+          type: string
+        documentsPrompt:
+          type: string
+        rubricPrompt:
+          type: string
+        personas:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminPersonaInput"
+
+    AdminScenarioUpdateRequest:
+      type: object
+      properties:
+        basePrompt:
+          type: string
+        challengePrompt:
+          type: string
+        documentsPrompt:
+          type: string
+        rubricPrompt:
+          type: string
+        personas:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminPersonaInput"
+
+    AdminScenarioUserStat:
+      type: object
+      required: [accountId, email, username, playCount, averageScore, bestScore]
+      properties:
+        accountId:
+          type: [string, "null"]
+          description: "null groups every anonymous (unauthenticated) play together"
+        email:
+          type: [string, "null"]
+          description: "null for the anonymous-plays group"
+        username:
+          type: [string, "null"]
+          description: |
+            "null" if the account has no username set (blanked out via admin
+            edit) or for the anonymous-plays group. UI display label falls
+            back to email, then "—".
+        playCount:
+          type: integer
+        averageScore:
+          type: [number, "null"]
+          description: "null if none of this user's plays had a parseable score"
+        bestScore:
+          type: [number, "null"]
+
+    AdminScenarioResultsSummary:
+      type: object
+      required: [scenarioId, totalPlays, totalUsers, averageScore, perUser]
+      properties:
+        scenarioId:
+          type: string
+        totalPlays:
+          type: integer
+          description: Total RESULT rows for this scenario
+        totalUsers:
+          type: integer
+          description: Distinct accountId values (anonymous plays count as one)
+        averageScore:
+          type: [number, "null"]
+          description: Average score across all plays with a parseable score
+        perUser:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminScenarioUserStat"
+          description: Sorted by averageScore descending
+
+    # ── Settings ──────────────────────────────────────────
+
+    SystemSetting:
+      type: object
+      required: [key, value]
+      properties:
+        key:
+          type: string
+          description: "Setting key (e.g. AI_PROVIDER / VOICE_PROVIDER)"
+        value:
+          type: string
+          description: Setting value
+
+    SettingsUpdateRequest:
+      type: object
+      required: [settings]
+      properties:
+        settings:
+          oneOf:
+            - type: array
+              items:
+                $ref: "#/components/schemas/SystemSetting"
+              minItems: 1
+            - type: object
+              additionalProperties:
+                type: string
+          description: Settings entries to update (array or key/value map); keys not included are left unchanged
+
+    # ── Tickets ───────────────────────────────────────────
+
+    TicketLedger:
+      type: object
+      required:
+        [
+          id,
+          accountId,
+          type,
+          isActive,
+          consumedAt,
+          consumedScenarioId,
+          revokedAt,
+          createdAt,
+        ]
+      properties:
+        id:
+          type: string
+        accountId:
+          type: string
+        type:
+          type: string
+          enum: [registration_grant, monthly_grant, purchase, admin_adjust]
+        isActive:
+          type: boolean
+        consumedAt:
+          type: [string, "null"]
+          description: ISO timestamp when the ticket was consumed, or null if unused
+        consumedScenarioId:
+          type: [string, "null"]
+          description: Scenario id the ticket was spent on, or null if unused
+        revokedAt:
+          type: [string, "null"]
+          description: ISO timestamp when the ticket was revoked by an admin, or null
+        createdAt:
+          type: string
+
+    TicketSnapshot:
+      type: object
+      required: [balance, nextGrantAt, ledger]
+      properties:
+        balance:
+          type: integer
+          description: Count of currently active (unconsumed, non-revoked) tickets
+        nextGrantAt:
+          type: string
+          description: ISO timestamp of the next scheduled grant
+        ledger:
+          type: array
+          items:
+            $ref: "#/components/schemas/TicketLedger"
+          description: Up to the 20 most recent ticket rows
+
+    TicketRevokeResult:
+      type: object
+      required: [balance, nextGrantAt, ledger, deletedCount]
+      properties:
+        balance:
+          type: integer
+          description: Count of currently active tickets after the revoke
+        nextGrantAt:
+          type: string
+          description: ISO timestamp of the next scheduled grant
+        ledger:
+          type: array
+          items:
+            $ref: "#/components/schemas/TicketLedger"
+          description: Up to the 20 most recent ticket rows
+        deletedCount:
+          type: integer
+          description: Number of active tickets actually revoked (may be fewer than requested)
+
+    TicketGrantRequest:
+      type: object
+      required: [count]
+      properties:
+        count:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          description: Number of admin_adjust tickets to grant
+
+    TicketRevokeRequest:
+      type: object
+      required: [count]
+      properties:
+        count:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          description: Maximum number of active tickets to revoke

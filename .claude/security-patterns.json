@@ -1,0 +1,19 @@
+{
+  "patterns": [
+    {
+      "rule_name": "next_public_secret",
+      "regex": "NEXT_PUBLIC_[A-Za-z0-9_]*(KEY|SECRET|TOKEN|PASSWORD)",
+      "reminder": "NEXT_PUBLIC_ はクライアントバンドルに焼き込まれます。秘密情報を置かないこと。OpenAIキーはサーバのみ、クライアントは ephemeral key 経由。"
+    },
+    {
+      "rule_name": "hardcoded_provider_key",
+      "regex": "sk-[A-Za-z0-9_-]{20,}",
+      "reminder": "OpenAI APIキーらしき文字列。ハードコードせず .env.local（サーバのみ）で扱うこと。"
+    },
+    {
+      "rule_name": "unsafe_model_output_render",
+      "regex": "dangerouslySetInnerHTML",
+      "reminder": "モデル出力/ユーザー入力をHTMLとして挿入しない（XSS）。テキストとして描画すること。"
+    }
+  ]
+}
