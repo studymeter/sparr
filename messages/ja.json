@@ -31,11 +31,11 @@
     "localeSwitchAria": "Switch to English"
   },
   "metadata": {
-    "title": "プロジェクトマネージャーのヤバい一日",
-    "description": "DXプロジェクトが大炎上！キレるユーザー、責任逃れのパワハラ上司、自分事じゃない部下…PMとして、コールでこの危機を乗り越えろ！",
-    "siteName": "プロジェクトマネージャーのヤバい一日",
-    "twitterDescription": "DXプロジェクトが大炎上！PMとして、コールでこの危機を乗り越えろ！",
-    "ogAlt": "プロジェクトマネージャーのヤバい一日",
+    "title": "Sparr",
+    "description": "Sparrは、実際の仕事のシチュエーションをAIとロールプレイするセルフホスト型エンジン。AIが演じる相手と声で対話し、終了後にスコアとフィードバックが得られます。",
+    "siteName": "Sparr",
+    "twitterDescription": "仕事のシチュエーションをAIと声でロールプレイ。終了後にスコアとフィードバックが得られます。",
+    "ogAlt": "Sparr",
     "signIn": "サインイン",
     "signUp": "新規登録",
     "account": "アカウント設定",
@@ -45,7 +45,8 @@
   "footer": {
     "company": "運営会社",
     "privacy": "プライバシーポリシー",
-    "terms": "利用規約"
+    "terms": "利用規約",
+    "tokushoho": "特定商取引法に基づく表記"
   },
   "contact": {
     "title": "貴社のオリジナルシナリオを制作します",
@@ -244,7 +245,7 @@
     }
   },
   "admin": {
-    "brand": "Sparr Admin",
+    "brandSuffix": "Admin",
     "playerLink": "プレイヤーへ →",
     "tabs": {
       "dashboard": "ダッシュボード",

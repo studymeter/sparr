@@ -40,6 +40,13 @@ export default function Footer() {
         >
           {t("terms")}
         </a>
+        <a
+          href="https://studymeter.jp/tokushoho"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {t("tokushoho")}
+        </a>
       </nav>
     </footer>
   );

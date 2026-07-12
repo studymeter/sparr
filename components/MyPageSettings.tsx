@@ -11,6 +11,7 @@ import {
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import SignOutButton from "@/components/SignOutButton";
 import Footer from "@/components/Footer";
+import BrandLogo from "@/components/BrandLogo";
 
 type Account = {
   id: string;
@@ -477,8 +478,8 @@ export default function MyPageSettings() {
   return (
     <div className="mp-page">
       <header className="mp-header">
-        <Link href="/" className="mp-brand sm-gradient-text">
-          Sparr
+        <Link href="/" className="mp-brand">
+          <BrandLogo />
         </Link>
         <nav className="mp-nav">
           <Link href="/" className="btn-tertiary">

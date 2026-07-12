@@ -28,8 +28,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: "metadata" });
 
   return {
-    metadataBase: new URL("https://arp.studymeter.jp"),
-    title: t("title"),
+    metadataBase: new URL("https://sparr.studymeter.jp"),
+    title: {
+      default: t("title"),
+      template: `%s | ${t("title")}`,
+    },
     description: t("description"),
     icons: {
       icon: "/logo_squared.png",
@@ -37,15 +40,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     openGraph: {
       type: "website",
-      url: "https://arp.studymeter.jp",
+      url: "https://sparr.studymeter.jp",
       title: t("title"),
       description: t("description"),
       siteName: t("siteName"),
+      images: [
+        {
+          url: "/ogp.png",
+          width: 1588,
+          height: 909,
+          alt: t("ogAlt"),
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title: t("title"),
       description: t("twitterDescription"),
+      images: ["/ogp.png"],
     },
   };
 }

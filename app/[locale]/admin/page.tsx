@@ -16,6 +16,7 @@ import {
 } from "@/lib/i18n/formatDate";
 import SignOutButton from "@/components/SignOutButton";
 import PasswordInput from "@/components/PasswordInput";
+import BrandLogo from "@/components/BrandLogo";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -542,6 +543,9 @@ const ST = {
     fontFamily: "var(--sm-font-display)",
     letterSpacing: "0.02em",
     flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
   } as React.CSSProperties,
   nav: {
     display: "flex",
@@ -3876,8 +3880,9 @@ function AdminHeader({
     <header style={ST.header}>
       <div style={ST.headerInner}>
         <div style={ST.headerLeft}>
-          <span className="sm-gradient-text" style={ST.brand}>
-            {t("brand")}
+          <span style={ST.brand}>
+            <BrandLogo className="brand-logo brand-logo-admin" />
+            {t("brandSuffix")}
           </span>
           <nav style={ST.nav}>
             {TAB_IDS.map((id) => (

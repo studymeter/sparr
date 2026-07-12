@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import DocumentViewer from "@/components/DocumentViewer";
 import CornerDeco from "@/components/CornerDeco";
+import BrandLogo from "@/components/BrandLogo";
 import type { GameState, Stakeholder } from "@/lib/types";
 
 // Guards against accidental back-navigation: intercepts popstate and asks
@@ -151,11 +152,8 @@ function FlagIcon() {
 function HubHeader() {
   return (
     <header className="mp-header briefing-header">
-      <a
-        href="https://sparr.studymeter.jp/"
-        className="mp-brand sm-gradient-text"
-      >
-        Sparr
+      <a href="https://sparr.studymeter.jp/" className="mp-brand">
+        <BrandLogo />
       </a>
     </header>
   );
