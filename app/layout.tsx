@@ -1,15 +1,22 @@
 import type { Viewport } from "next";
+import { getLocale } from "next-intl/server";
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
 };
 
-// Root layout is a passthrough; html/body live in app/[locale]/layout.tsx.
-export default function RootLayout({
+// Next.js requires <html> and <body> in the root layout (not a nested segment).
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  const locale = await getLocale();
+
+  return (
+    <html lang={locale}>
+      <body>{children}</body>
+    </html>
+  );
 }
