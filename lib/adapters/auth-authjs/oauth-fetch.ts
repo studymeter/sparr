@@ -28,9 +28,12 @@ function resolveDispatcher(): Dispatcher {
     return dispatcher;
   }
 
+  // Prefer IPv4: oauth2.googleapis.com often hangs on broken IPv6 routes
+  // (ETIMEDOUT during Auth.js token exchange → Configuration error on sign-in).
   dispatcher = new Agent({
     connect: {
       timeout: OAUTH_FETCH_TIMEOUT_MS,
+      family: 4,
     },
   });
   return dispatcher;
