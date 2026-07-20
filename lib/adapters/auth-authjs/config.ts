@@ -4,6 +4,7 @@ import Google from "next-auth/providers/google";
 import { customFetch } from "next-auth";
 import type { NextAuthConfig } from "next-auth";
 import type { Store } from "@/lib/providers";
+import { syncTicketGrants } from "@/lib/tickets";
 import {
   googleHostedDomainHint,
   isEmailDomainAllowed,
@@ -120,7 +121,12 @@ async function enrichJwtToken(getStore: GetStore, params: JwtParams) {
     token.sub = userId;
   }
   if (user && "role" in user) {
-    token.role = (user as { role: UserRole }).role;
+    const role = (user as { role: UserRole }).role;
+    token.role = role;
+    if (role === "player" && userId) {
+      const store = await getStore();
+      await syncTicketGrants(store, String(userId));
+    }
     return token;
   }
   if (!userId) return token;

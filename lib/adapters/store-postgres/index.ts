@@ -19,6 +19,7 @@ import { uid } from "@/lib/id";
 import { TICKET_INITIAL_GRANT_COUNT } from "@/lib/constants";
 
 type Queryable = Pool | PoolClient;
+const POSTGRES_SCHEMA_VERSION = 1;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -807,9 +808,43 @@ function createBillingFulfillmentStore(pool: Pool): BillingFulfillmentStore {
 }
 
 async function migrate(pool: Pool): Promise<void> {
+  await ensureSchemaMetaTable(pool);
+  const currentVersion = await readSchemaVersion(pool);
+  if (currentVersion >= POSTGRES_SCHEMA_VERSION) return;
+
   await createTables(pool);
   await applyColumnMigrations(pool);
   await seedRegistrationGrants(pool);
+  await writeSchemaVersion(pool, POSTGRES_SCHEMA_VERSION);
+}
+
+async function ensureSchemaMetaTable(pool: Pool): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS schema_meta (
+      id SMALLINT PRIMARY KEY,
+      version INTEGER NOT NULL
+    )
+  `);
+}
+
+async function readSchemaVersion(pool: Pool): Promise<number> {
+  const result = await pool.query<{ version: number }>(
+    "SELECT version FROM schema_meta WHERE id = 1"
+  );
+  if (!result.rows[0]) return 0;
+  return Number(result.rows[0].version) || 0;
+}
+
+async function writeSchemaVersion(pool: Pool, version: number): Promise<void> {
+  await pool.query(
+    `
+      INSERT INTO schema_meta (id, version)
+      VALUES (1, $1)
+      ON CONFLICT (id)
+      DO UPDATE SET version = EXCLUDED.version
+    `,
+    [version]
+  );
 }
 
 async function createTables(pool: Pool): Promise<void> {

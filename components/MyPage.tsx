@@ -18,6 +18,7 @@ type Account = {
   email: string;
   username: string;
   role: string;
+  tickets?: TicketSnapshot;
 };
 
 type TicketRow = {
@@ -116,10 +117,7 @@ function useMyPageData() {
       if (accRes.ok) {
         const accountData = (await accRes.json()) as Account;
         setAccount(accountData);
-        const ticketRes = await fetch("/api/player/tickets");
-        if (active && ticketRes.ok) {
-          setTickets((await ticketRes.json()) as TicketSnapshot);
-        }
+        setTickets(accountData.tickets ?? null);
       }
       if (scRes.ok) setScenarios((await scRes.json()) as ScenarioCard[]);
       if (reRes.ok) {

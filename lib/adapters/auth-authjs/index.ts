@@ -11,7 +11,6 @@ import type {
   Store,
 } from "@/lib/providers";
 import { uid } from "@/lib/id";
-import { syncTicketGrants } from "@/lib/tickets";
 import { canChangePassword } from "@/lib/auth/sign-in-method";
 import { buildAuthJsConfig } from "./config";
 import { resolveAuthUrl } from "./auth-url";
@@ -107,10 +106,6 @@ export class AuthJsAuthProvider implements AuthProvider {
     if (!account) {
       console.info("再ログインをしてください。");
       return anonymous();
-    }
-
-    if (user.role === "player") {
-      await syncTicketGrants(store, user.id);
     }
     return {
       id: user.id,

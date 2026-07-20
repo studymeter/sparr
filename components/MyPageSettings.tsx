@@ -17,6 +17,7 @@ type Account = {
   role: string;
   signInMethod: "password" | "oauth";
   oauthProvider: string | null;
+  tickets?: TicketSnapshot;
 };
 
 type TicketRow = {
@@ -111,7 +112,7 @@ function useAccountSettings() {
         const data = (await res.json()) as Account;
         setAccount(data);
         setUsername(data.username);
-        await refreshTickets();
+        setTickets(data.tickets ?? null);
       }
       setStatus("ready");
     })();
@@ -515,28 +516,29 @@ export default function MyPageSettings() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("tickets");
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
-  const [purchaseStatus, setPurchaseStatus] = useState<
-    "success" | "cancel" | null
-  >(null);
+  const [purchaseStatus] = useState<"success" | "cancel" | null>(() => {
+    if (typeof window === "undefined") return null;
+    const status = new URLSearchParams(window.location.search).get("billing");
+    return status === "success" || status === "cancel" ? status : null;
+  });
   const settings = useAccountSettings();
+  const refreshTickets = settings.refreshTickets;
 
   useEffect(() => {
+    if (purchaseStatus !== "success") return;
+    void refreshTickets();
+  }, [purchaseStatus, refreshTickets]);
+
+  useEffect(() => {
+    if (!purchaseStatus) return;
     const params = new URLSearchParams(window.location.search);
-    const status = params.get("billing");
-    if (status === "success" || status === "cancel") {
-      setPurchaseStatus(status);
-      setIsPurchasing(false);
-      if (status === "success") {
-        void settings.refreshTickets();
-      }
-      params.delete("billing");
-      const next = params.toString();
-      const nextUrl = next
-        ? `${window.location.pathname}?${next}`
-        : window.location.pathname;
-      window.history.replaceState({}, "", nextUrl);
-    }
-  }, [settings.refreshTickets]);
+    params.delete("billing");
+    const next = params.toString();
+    const nextUrl = next
+      ? `${window.location.pathname}?${next}`
+      : window.location.pathname;
+    window.history.replaceState({}, "", nextUrl);
+  }, [purchaseStatus]);
 
   useEffect(() => {
     const onPageShow = (): void => {

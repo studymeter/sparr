@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSignInMethod } from "@/lib/auth/sign-in-method";
 import { providers } from "@/lib/composition";
+import { getTicketSnapshot } from "@/lib/tickets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,12 +20,14 @@ export async function GET() {
     if (!account) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
-    const signInMethod = await getSignInMethod(store, principal.id);
     const oauthAccounts = await store.oauthAccounts.listByAccount(principal.id);
+    const signInMethod = oauthAccounts.length > 0 ? "oauth" : "password";
+    const tickets = await getTicketSnapshot(store, principal.id);
     return NextResponse.json({
       ...account,
       signInMethod,
       oauthProvider: oauthAccounts[0]?.provider ?? null,
+      tickets,
     });
   } catch (err) {
     console.error("[player/account:get] error:", err);

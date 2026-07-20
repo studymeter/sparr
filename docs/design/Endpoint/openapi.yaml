@@ -474,7 +474,9 @@ paths:
         1. Verify the session via SessionCookie (return 401 if unauthenticated)
         2. Obtain the account ID via AuthProvider.getPrincipal()
         3. Call Store.accounts.get(id)
-        4. Return AccountProfile (id / email / username / role) with 200
+        4. Load OAuth linkage and infer signInMethod / oauthProvider
+        5. Compute TicketSnapshot (balance / ledger)
+        6. Return AccountProfile with account fields and ticket snapshot
       operationId: getAccount
       security:
         - SessionCookie: []
@@ -713,6 +715,14 @@ components:
         role:
           type: string
           enum: [player, admin]
+        signInMethod:
+          type: string
+          enum: [password, oauth]
+        oauthProvider:
+          type: string
+          nullable: true
+        tickets:
+          $ref: "#/components/schemas/TicketSnapshot"
 
     AccountUpdateRequest:
       type: object
