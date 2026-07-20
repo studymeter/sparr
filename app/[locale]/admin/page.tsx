@@ -10,10 +10,7 @@ import {
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
-import {
-  formatDateOnlyTable,
-  formatDateTimeTable,
-} from "@/lib/i18n/formatDate";
+import { formatDateTimeTable } from "@/lib/i18n/formatDate";
 import SignOutButton from "@/components/SignOutButton";
 import PasswordInput from "@/components/PasswordInput";
 import BrandLogo from "@/components/BrandLogo";
@@ -88,7 +85,6 @@ type TicketRow = {
 };
 type TicketSnapshot = {
   balance: number;
-  nextGrantAt: string;
   ledger: TicketRow[];
 };
 type ScenarioModal =
@@ -139,14 +135,6 @@ type PromptFieldDef = {
 function formatDate(iso: string | undefined | null, locale: Locale): string {
   if (!iso) return "—";
   return formatDateTimeTable(iso, locale);
-}
-
-function formatDateOnly(
-  iso: string | undefined | null,
-  locale: Locale
-): string {
-  if (!iso) return "—";
-  return formatDateOnlyTable(iso, locale);
 }
 
 function ticketTypeLabel(
@@ -1706,19 +1694,12 @@ function TicketOverview({
   const t = useTranslations("admin");
   const ta = useTranslations("account");
   const tc = useTranslations("common");
-  const locale = useLocale() as Locale;
   return (
     <>
       <div className="auth-field">
         <span className="auth-label">{t("tickets.balance")}</span>
         <div className="auth-readonly">
           {snapshot.balance} {ta("ticketUnit")}
-        </div>
-      </div>
-      <div className="auth-field">
-        <span className="auth-label">{t("tickets.nextGrant")}</span>
-        <div className="auth-readonly">
-          {formatDateOnly(snapshot.nextGrantAt, locale)}
         </div>
       </div>
       <div style={ST.ticketFormsRow}>

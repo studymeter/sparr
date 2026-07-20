@@ -4,6 +4,7 @@ import type {
   AccountCreateInput,
   AccountListFilter,
   AccountWithCredential,
+  BillingFulfillmentStore,
   OAuthAccount,
   OAuthAccountCreateInput,
   Result,
@@ -27,6 +28,7 @@ function toPublicAccount(row: AccountWithCredential): Account {
     username: row.username,
     role: row.role,
     emailVerified: row.emailVerified,
+    stripeCustomerId: row.stripeCustomerId,
     createdAt: row.createdAt,
   };
 }
@@ -45,6 +47,7 @@ export async function createPostgresStore(
     results: createResultStore(pool),
     settings: createSettingStore(pool),
     ticketLedger: createTicketLedgerStore(pool),
+    billingFulfillments: createBillingFulfillmentStore(pool),
   };
 }
 
@@ -56,8 +59,8 @@ async function insertAccount(
   const email = input.email.toLowerCase();
   await pool.query(
     `
-      INSERT INTO account (id, email, password_hash, username, role, email_verified, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO account (id, email, password_hash, username, role, email_verified, stripe_customer_id, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `,
     [
       id,
@@ -66,6 +69,7 @@ async function insertAccount(
       input.username,
       input.role,
       input.emailVerified ?? null,
+      input.stripeCustomerId ?? null,
       input.createdAt ?? nowIso(),
     ]
   );
@@ -77,6 +81,7 @@ async function insertAccount(
     username: input.username,
     role: input.role,
     emailVerified,
+    stripeCustomerId: input.stripeCustomerId ?? null,
     createdAt,
   };
 }
@@ -88,7 +93,7 @@ async function getAccountWithCredential(
   const result = await pool.query(
     `
       SELECT id, email, password_hash AS "passwordHash", username, role
-           , email_verified AS "emailVerified", created_at AS "createdAt"
+           , email_verified AS "emailVerified", stripe_customer_id AS "stripeCustomerId", created_at AS "createdAt"
       FROM account
       WHERE id = $1
     `,
@@ -105,7 +110,7 @@ async function findAccountByEmail(
   const result = await pool.query(
     `
       SELECT id, email, password_hash AS "passwordHash", username, role
-           , email_verified AS "emailVerified", created_at AS "createdAt"
+           , email_verified AS "emailVerified", stripe_customer_id AS "stripeCustomerId", created_at AS "createdAt"
       FROM account
       WHERE email = $1
     `,
@@ -134,7 +139,7 @@ async function listAccounts(
 
   const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
   const result = await pool.query(
-    `SELECT id, email, username, role, email_verified AS "emailVerified", created_at AS "createdAt" FROM account ${where} ORDER BY email ASC`,
+    `SELECT id, email, username, role, email_verified AS "emailVerified", stripe_customer_id AS "stripeCustomerId", created_at AS "createdAt" FROM account ${where} ORDER BY email ASC`,
     values
   );
   return result.rows as Account[];
@@ -145,7 +150,7 @@ function createAccountStore(pool: Pool): Store["accounts"] {
     create: (input) => insertAccount(pool, input),
     async get(id) {
       const result = await pool.query(
-        'SELECT id, email, username, role, email_verified AS "emailVerified", created_at AS "createdAt" FROM account WHERE id = $1',
+        'SELECT id, email, username, role, email_verified AS "emailVerified", stripe_customer_id AS "stripeCustomerId", created_at AS "createdAt" FROM account WHERE id = $1',
         [id]
       );
       if (!result.rows[0]) return null;
@@ -164,10 +169,17 @@ function createAccountStore(pool: Pool): Store["accounts"] {
       await pool.query(
         `
           UPDATE account
-          SET email = $1, username = $2, role = $3, email_verified = $4
-          WHERE id = $5
+          SET email = $1, username = $2, role = $3, email_verified = $4, stripe_customer_id = $5
+          WHERE id = $6
         `,
-        [next.email, next.username, next.role, next.emailVerified, id]
+        [
+          next.email,
+          next.username,
+          next.role,
+          next.emailVerified,
+          next.stripeCustomerId ?? null,
+          id,
+        ]
       );
       return toPublicAccount(next);
     },
@@ -644,7 +656,7 @@ async function getTicketById(
 }
 
 // Revocation is logical (is_active = false + revoked_at): the row stays in
-// the ledger, so grant sync still counts it and never re-issues the grant.
+// the ledger, so registration-grant sync still counts it and never re-issues.
 async function revokeTicketById(pool: Pool, id: string): Promise<void> {
   await pool.query(
     `
@@ -691,7 +703,7 @@ function createTicketLedgerStore(pool: Pool): Store["ticketLedger"] {
           SELECT COUNT(*) AS count
           FROM ticket_ledger
           WHERE account_id = $1
-            AND type IN ('registration_grant', 'monthly_grant')
+            AND type = 'registration_grant'
         `,
         [accountId]
       );
@@ -718,6 +730,29 @@ function createTicketLedgerStore(pool: Pool): Store["ticketLedger"] {
   };
 }
 
+function createBillingFulfillmentStore(pool: Pool): BillingFulfillmentStore {
+  return {
+    async createIfAbsent(input) {
+      const result = await pool.query(
+        `
+          INSERT INTO billing_fulfillment
+          (id, stripe_session_id, account_id, ticket_count, created_at)
+          VALUES ($1, $2, $3, $4, $5)
+          ON CONFLICT (stripe_session_id) DO NOTHING
+        `,
+        [
+          uid("billf_"),
+          input.stripeSessionId,
+          input.accountId,
+          input.ticketCount,
+          nowIso(),
+        ]
+      );
+      return (result.rowCount ?? 0) > 0;
+    },
+  };
+}
+
 async function migrate(pool: Pool): Promise<void> {
   await createTables(pool);
   await applyColumnMigrations(pool);
@@ -733,6 +768,7 @@ async function createTables(pool: Pool): Promise<void> {
       username TEXT NOT NULL,
       role TEXT NOT NULL,
       email_verified TEXT,
+      stripe_customer_id TEXT,
       created_at TEXT NOT NULL
     );
 
@@ -786,6 +822,14 @@ async function createTables(pool: Pool): Promise<void> {
       revoked_at TEXT,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS billing_fulfillment (
+      id TEXT PRIMARY KEY,
+      stripe_session_id TEXT NOT NULL UNIQUE,
+      account_id TEXT NOT NULL REFERENCES account(id) ON DELETE CASCADE,
+      ticket_count INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
   `);
 }
 
@@ -795,6 +839,9 @@ async function applyColumnMigrations(pool: Pool): Promise<void> {
   );
   await pool.query(
     "ALTER TABLE account ADD COLUMN IF NOT EXISTS created_at TEXT"
+  );
+  await pool.query(
+    "ALTER TABLE account ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT"
   );
   await pool.query(
     "UPDATE account SET created_at = $1 WHERE created_at IS NULL",
@@ -827,6 +874,15 @@ async function applyColumnMigrations(pool: Pool): Promise<void> {
   await pool.query(
     "ALTER TABLE ticket_ledger ADD COLUMN IF NOT EXISTS revoked_at TEXT"
   );
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS billing_fulfillment (
+      id TEXT PRIMARY KEY,
+      stripe_session_id TEXT NOT NULL UNIQUE,
+      account_id TEXT NOT NULL REFERENCES account(id) ON DELETE CASCADE,
+      ticket_count INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
 }
 
 async function seedRegistrationGrants(pool: Pool): Promise<void> {

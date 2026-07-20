@@ -110,7 +110,6 @@
     "subtitle": "Manage your profile.",
     "ticketBalance": "Ticket balance",
     "ticketUnit": "tickets",
-    "nextGrantDate": "Next grant date",
     "history": "History",
     "noHistory": "No history",
     "dateTime": "Date & time",
@@ -122,7 +121,7 @@
     "changePassword": "Change password",
     "backToMyPage": "Back to My Page",
     "ticketTypeRegistration": "Registration grant",
-    "ticketTypeMonthly": "Monthly grant",
+    "ticketTypeMonthly": "Monthly grant (legacy)",
     "ticketTypePurchase": "Purchase",
     "ticketTypeAdminAdjust": "Admin adjustment"
   },
@@ -146,12 +145,13 @@
     "noDescription": "No description available.",
     "recentSessions": "Recent sessions",
     "noTicketsTitle": "No tickets available",
-    "nextGrant": "Next grant: {date}",
-    "waitForGrant": "Please wait for the next grant.",
     "startConfirm": "Start {title}?",
     "thisScenario": "this scenario",
     "consumesTicket": "Starting will consume 1 ticket.",
-    "startsSetup": "Starting will begin setup."
+    "startsSetup": "Starting will begin setup.",
+    "buyTicketsHint": "Buy tickets to keep playing.",
+    "buyTickets": "Buy tickets",
+    "buyTicketsRedirecting": "Redirecting to checkout…"
   },
   "game": {
     "workMemoFallback": "Work memo",
@@ -300,7 +300,6 @@
     },
     "tickets": {
       "balance": "Ticket balance",
-      "nextGrant": "Next grant date",
       "history": "History",
       "noHistory": "No history.",
       "grantFailed": "Failed to grant tickets",

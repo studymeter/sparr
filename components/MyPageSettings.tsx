@@ -4,10 +4,7 @@ import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
-import {
-  formatDateTimeTable,
-  formatDateOnlyTable,
-} from "@/lib/i18n/formatDate";
+import { formatDateTimeTable } from "@/lib/i18n/formatDate";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import SignOutButton from "@/components/SignOutButton";
 import Footer from "@/components/Footer";
@@ -34,7 +31,6 @@ type TicketRow = {
 
 type TicketSnapshot = {
   balance: number;
-  nextGrantAt: string;
   ledger: TicketRow[];
 };
 
@@ -331,14 +327,6 @@ function TicketsPanel({
           </span>
           <span className="mypage-settings-stat-value">
             {tickets.balance} {ta("ticketUnit")}
-          </span>
-        </div>
-        <div className="mypage-settings-stat">
-          <span className="mypage-settings-stat-label">
-            {ta("nextGrantDate")}
-          </span>
-          <span className="mypage-settings-stat-value">
-            {formatDateOnlyTable(tickets.nextGrantAt, locale)}
           </span>
         </div>
       </div>

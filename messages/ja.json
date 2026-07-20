@@ -110,7 +110,6 @@
     "subtitle": "プロフィールを管理します。",
     "ticketBalance": "チケット残高",
     "ticketUnit": "枚",
-    "nextGrantDate": "次回付与日",
     "history": "履歴",
     "noHistory": "履歴はありません",
     "dateTime": "日時",
@@ -122,7 +121,7 @@
     "changePassword": "パスワードを変更",
     "backToMyPage": "マイページに戻る",
     "ticketTypeRegistration": "登録時付与",
-    "ticketTypeMonthly": "月次付与",
+    "ticketTypeMonthly": "月次付与（旧）",
     "ticketTypePurchase": "購入",
     "ticketTypeAdminAdjust": "管理調整"
   },
@@ -146,12 +145,13 @@
     "noDescription": "シナリオの説明がありません。",
     "recentSessions": "最近のセッション",
     "noTicketsTitle": "チケットがありません",
-    "nextGrant": "次回付与: {date}",
-    "waitForGrant": "次回付与をお待ちください。",
     "startConfirm": "{title}を開始しますか？",
     "thisScenario": "このシナリオ",
     "consumesTicket": "開始するとチケットを1枚消費します。",
-    "startsSetup": "開始するとセットアップが始まります。"
+    "startsSetup": "開始するとセットアップが始まります。",
+    "buyTicketsHint": "チケットを購入してプレイを続けられます。",
+    "buyTickets": "チケットを購入",
+    "buyTicketsRedirecting": "チェックアウトへ移動中…"
   },
   "game": {
     "workMemoFallback": "作業メモ",
@@ -300,7 +300,6 @@
     },
     "tickets": {
       "balance": "チケット残高",
-      "nextGrant": "次回付与日",
       "history": "履歴",
       "noHistory": "履歴はありません。",
       "grantFailed": "チケットの付与に失敗しました",

@@ -14,7 +14,7 @@ A generic AI roleplay training engine (OSS, self-hosted). The player talks by vo
 
 - Next.js (App Router) + TypeScript. Package manager: **npm** (Node 20+).
 - Structure: **Provider/Adapter** (swap boundaries) — AI / Voice / Auth / Store. Wiring is centralized in `lib/composition.ts` (client voice in `lib/composition.client.ts`).
-- Built-in adapters: AI/Voice = OpenAI (+ Azure), Store = SQLite (OSS default) / memory / PostgreSQL, Auth = Auth.js.
+- Built-in adapters: AI/Voice = OpenAI (+ Azure), Store = SQLite (OSS default) / memory / PostgreSQL (including Supabase via `STORE_PROVIDER=supabase`), Auth = Auth.js.
 - Persistence goes through `Store` (OSS default SQLite); auth through `AuthProvider` (optional).
 
 ## Constraints

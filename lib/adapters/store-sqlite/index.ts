@@ -4,6 +4,7 @@ import Database from "better-sqlite3";
 import type {
   Account,
   AccountCreateInput,
+  BillingFulfillmentStore,
   AccountListFilter,
   AccountStore,
   AccountWithCredential,
@@ -39,6 +40,7 @@ function toPublicAccount(row: AccountWithCredential): Account {
     username: row.username,
     role: row.role,
     emailVerified: row.emailVerified,
+    stripeCustomerId: row.stripeCustomerId,
     createdAt: row.createdAt,
   };
 }
@@ -61,6 +63,7 @@ export function createSqliteStore(dbPath: string): Store {
     results: createResultsStore(db),
     settings: createSettingsStore(db),
     ticketLedger: createTicketLedgerStore(db),
+    billingFulfillments: createBillingFulfillmentStore(db),
   };
 }
 
@@ -70,7 +73,7 @@ function selectAccountRowById(
 ): AccountWithCredential | undefined {
   return db
     .prepare(
-      "SELECT id, email, password_hash as passwordHash, username, role, email_verified as emailVerified, created_at as createdAt FROM account WHERE id = ?"
+      "SELECT id, email, password_hash as passwordHash, username, role, email_verified as emailVerified, stripe_customer_id as stripeCustomerId, created_at as createdAt FROM account WHERE id = ?"
     )
     .get(id) as AccountWithCredential | undefined;
 }
@@ -90,8 +93,8 @@ function insertAccount(
   const id = input.id || uid("acct_");
   db.prepare(
     `
-      INSERT INTO account (id, email, password_hash, username, role, email_verified, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO account (id, email, password_hash, username, role, email_verified, stripe_customer_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     id,
@@ -100,6 +103,7 @@ function insertAccount(
     input.username,
     input.role,
     input.emailVerified ?? null,
+    input.stripeCustomerId ?? null,
     input.createdAt ?? nowIso()
   );
   return {
@@ -108,6 +112,7 @@ function insertAccount(
     username: input.username,
     role: input.role,
     emailVerified: input.emailVerified ?? null,
+    stripeCustomerId: input.stripeCustomerId ?? null,
     createdAt: input.createdAt ?? nowIso(),
   };
 }
@@ -127,10 +132,17 @@ function updateAccount(
   db.prepare(
     `
       UPDATE account
-      SET email = ?, username = ?, role = ?, email_verified = ?
+      SET email = ?, username = ?, role = ?, email_verified = ?, stripe_customer_id = ?
       WHERE id = ?
     `
-  ).run(next.email, next.username, next.role, next.emailVerified, id);
+  ).run(
+    next.email,
+    next.username,
+    next.role,
+    next.emailVerified,
+    next.stripeCustomerId ?? null,
+    id
+  );
   return toPublicAccount(next);
 }
 
@@ -138,7 +150,8 @@ function listAccounts(
   db: Database.Database,
   filter?: AccountListFilter
 ): Account[] {
-  let sql = "SELECT id, email, username, role FROM account";
+  let sql =
+    "SELECT id, email, username, role, stripe_customer_id as stripeCustomerId FROM account";
   const clauses: string[] = [];
   const args: unknown[] = [];
   if (filter?.role) {
@@ -152,8 +165,8 @@ function listAccounts(
   if (clauses.length > 0) sql += ` WHERE ${clauses.join(" AND ")}`;
   sql += " ORDER BY email ASC";
   sql = sql.replace(
-    "SELECT id, email, username, role FROM account",
-    "SELECT id, email, username, role, email_verified as emailVerified, created_at as createdAt FROM account"
+    "SELECT id, email, username, role, stripe_customer_id as stripeCustomerId FROM account",
+    "SELECT id, email, username, role, email_verified as emailVerified, stripe_customer_id as stripeCustomerId, created_at as createdAt FROM account"
   );
   const rows = db.prepare(sql).all(...args) as Account[];
   return rows.map((row) => ({
@@ -179,7 +192,7 @@ function createAccountsStore(db: Database.Database): AccountStore {
     async findByEmail(email) {
       const row = db
         .prepare(
-          "SELECT id, email, password_hash as passwordHash, username, role, email_verified as emailVerified, created_at as createdAt FROM account WHERE email = ?"
+          "SELECT id, email, password_hash as passwordHash, username, role, email_verified as emailVerified, stripe_customer_id as stripeCustomerId, created_at as createdAt FROM account WHERE email = ?"
         )
         .get(email.toLowerCase()) as AccountWithCredential | undefined;
       return row ? { ...row, email: row.email.toLowerCase() } : null;
@@ -747,7 +760,7 @@ function getTicketById(db: Database.Database, id: string): TicketLedger | null {
 }
 
 // Revocation is logical (is_active = 0 + revoked_at): the row stays in the
-// ledger, so grant sync still counts it and never re-issues the grant.
+// ledger, so registration-grant sync still counts it and never re-issues.
 function revokeActiveTicketBatch(
   db: Database.Database,
   accountId: string,
@@ -786,7 +799,7 @@ function createTicketLedgerStore(db: Database.Database): TicketLedgerStore {
             SELECT COUNT(*) as count
             FROM ticket_ledger
             WHERE account_id = ?
-              AND type IN ('registration_grant', 'monthly_grant')
+              AND type = 'registration_grant'
           `
         )
         .get(accountId) as { count: number };
@@ -827,6 +840,33 @@ function createTicketLedgerStore(db: Database.Database): TicketLedgerStore {
   };
 }
 
+function createBillingFulfillmentStore(
+  db: Database.Database
+): BillingFulfillmentStore {
+  return {
+    async createIfAbsent(input) {
+      const id = uid("billf_");
+      const createdAt = nowIso();
+      const result = db
+        .prepare(
+          `
+            INSERT OR IGNORE INTO billing_fulfillment
+            (id, stripe_session_id, account_id, ticket_count, created_at)
+            VALUES (?, ?, ?, ?, ?)
+          `
+        )
+        .run(
+          id,
+          input.stripeSessionId,
+          input.accountId,
+          input.ticketCount,
+          createdAt
+        );
+      return result.changes > 0;
+    },
+  };
+}
+
 type TableInfoRow = {
   name: string;
 };
@@ -840,6 +880,7 @@ function assertSchemaCompatibility(db: Database.Database): void {
       "username",
       "role",
       "email_verified",
+      "stripe_customer_id",
       "created_at",
     ],
     oauth_account: ["id", "account_id", "provider", "provider_account_id"],
@@ -868,6 +909,14 @@ function assertSchemaCompatibility(db: Database.Database): void {
       "is_active",
       "consumed_at",
       "consumed_scenario_id",
+      "revoked_at",
+      "created_at",
+    ],
+    billing_fulfillment: [
+      "id",
+      "stripe_session_id",
+      "account_id",
+      "ticket_count",
       "created_at",
     ],
   };
@@ -894,6 +943,7 @@ function migrate(db: Database.Database): void {
   migrateAccountTable(db);
   migrateScenarioTable(db);
   migrateTicketLedgerTable(db);
+  migrateBillingFulfillmentTable(db);
   seedTicketsForPlayers(db);
 }
 
@@ -906,6 +956,7 @@ function createBaseTables(db: Database.Database): void {
       username TEXT NOT NULL,
       role TEXT NOT NULL,
       email_verified TEXT,
+      stripe_customer_id TEXT,
       created_at TEXT NOT NULL
     );
 
@@ -959,6 +1010,14 @@ function createBaseTables(db: Database.Database): void {
       revoked_at TEXT,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS billing_fulfillment (
+      id TEXT PRIMARY KEY,
+      stripe_session_id TEXT NOT NULL UNIQUE,
+      account_id TEXT NOT NULL REFERENCES account(id) ON DELETE CASCADE,
+      ticket_count INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
   `);
 }
 
@@ -968,6 +1027,9 @@ function migrateAccountTable(db: Database.Database): void {
   }
   if (!tableHasColumn(db, "account", "created_at")) {
     db.exec("ALTER TABLE account ADD COLUMN created_at TEXT;");
+  }
+  if (!tableHasColumn(db, "account", "stripe_customer_id")) {
+    db.exec("ALTER TABLE account ADD COLUMN stripe_customer_id TEXT;");
   }
   db.prepare("UPDATE account SET created_at = ? WHERE created_at IS NULL").run(
     nowIso()
@@ -982,10 +1044,11 @@ function migrateAccountTable(db: Database.Database): void {
         username TEXT NOT NULL,
         role TEXT NOT NULL,
         email_verified TEXT,
+        stripe_customer_id TEXT,
         created_at TEXT NOT NULL
       );
-      INSERT INTO account_next (id, email, password_hash, username, role, email_verified, created_at)
-      SELECT id, email, password_hash, username, role, email_verified, created_at FROM account;
+      INSERT INTO account_next (id, email, password_hash, username, role, email_verified, stripe_customer_id, created_at)
+      SELECT id, email, password_hash, username, role, email_verified, stripe_customer_id, created_at FROM account;
       DROP TABLE account;
       ALTER TABLE account_next RENAME TO account;
       PRAGMA foreign_keys = ON;
@@ -1018,6 +1081,18 @@ function migrateTicketLedgerTable(db: Database.Database): void {
   if (!tableHasColumn(db, "ticket_ledger", "revoked_at")) {
     db.prepare("ALTER TABLE ticket_ledger ADD COLUMN revoked_at TEXT").run();
   }
+}
+
+function migrateBillingFulfillmentTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS billing_fulfillment (
+      id TEXT PRIMARY KEY,
+      stripe_session_id TEXT NOT NULL UNIQUE,
+      account_id TEXT NOT NULL REFERENCES account(id) ON DELETE CASCADE,
+      ticket_count INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
 }
 
 function seedTicketsForPlayers(db: Database.Database): void {

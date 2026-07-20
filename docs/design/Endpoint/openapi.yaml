@@ -541,8 +541,8 @@ paths:
       description: |
         1. Obtain the principal via providers.auth.getPrincipal()
         2. Return 401 (error "unauthenticated") if the principal is anonymous
-        3. Sync any owed grants, then compute the snapshot via getTicketSnapshot()
-        4. Return TicketSnapshot (balance / nextGrantAt / ledger) with 200
+        3. Sync the registration grant if owed, then compute the snapshot via getTicketSnapshot()
+        4. Return TicketSnapshot (balance / ledger) with 200
 
         - ledger holds up to the 20 most recent ticket rows
       operationId: getPlayerTickets
@@ -563,6 +563,82 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/player/billing/checkout:
+    post:
+      tags: [Tickets]
+      summary: Start Stripe Checkout for a ticket purchase
+      description: |
+        1. Resolve principal via providers.auth.getPrincipal()
+        2. Return 401 for anonymous, 403 for non-player roles
+        3. Accept optional BillingCheckoutRequest (quantity: integer 1..1000; default 1)
+        4. Resolve (or create) Stripe customer id for the player account
+        5. Create Stripe Checkout session in payment mode (unit price × quantity)
+        6. Return the hosted checkout URL with 200
+      operationId: postPlayerBillingCheckout
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BillingCheckoutRequest"
+      responses:
+        "200":
+          description: Checkout session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingCheckoutResponse"
+        "400":
+          description: Invalid quantity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthenticated (anonymous principal)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden (non-player principal)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Checkout session creation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/webhooks/stripe:
+    post:
+      tags: [Tickets]
+      summary: Stripe webhook receiver for paid ticket fulfillment
+      description: |
+        1. Read raw request body and verify Stripe signature
+        2. Return 400 when signature verification fails
+        3. On checkout.session.completed, fulfill ticket grants idempotently
+        4. Always return 200 on valid signatures
+      operationId: postStripeWebhook
+      responses:
+        "200":
+          description: Webhook accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookReceivedResponse"
+        "400":
+          description: Invalid signature
           content:
             application/json:
               schema:
@@ -661,6 +737,32 @@ components:
       required: [ok]
       properties:
         ok:
+          type: boolean
+
+    BillingCheckoutRequest:
+      type: object
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 1
+          description: Number of tickets to buy at the Stripe unit price
+
+    BillingCheckoutResponse:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Stripe-hosted checkout URL
+
+    WebhookReceivedResponse:
+      type: object
+      required: [received]
+      properties:
+        received:
           type: boolean
 
     # -- Gameplay schemas (from Provider layer) --------------------
@@ -1139,7 +1241,7 @@ components:
           type: string
         type:
           type: string
-          enum: [registration_grant, monthly_grant, purchase, admin_adjust]
+          enum: [registration_grant, purchase, admin_adjust]
         isActive:
           type: boolean
         consumedAt:
@@ -1159,14 +1261,11 @@ components:
 
     TicketSnapshot:
       type: object
-      required: [balance, nextGrantAt, ledger]
+      required: [balance, ledger]
       properties:
         balance:
           type: integer
           description: Count of currently active (unconsumed, non-revoked) tickets
-        nextGrantAt:
-          type: string
-          description: ISO timestamp of the next scheduled grant
         ledger:
           type: array
           items:

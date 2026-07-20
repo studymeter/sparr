@@ -20,6 +20,8 @@ export type {
   AccountListFilter,
   AccountStore,
   AccountWithCredential,
+  BillingFulfillmentCreateInput,
+  BillingFulfillmentStore,
   OAuthAccount,
   OAuthAccountCreateInput,
   OAuthAccountStore,

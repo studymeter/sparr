@@ -11,6 +11,7 @@ export type Account = {
   username: string;
   role: AccountRole;
   emailVerified: string | null;
+  stripeCustomerId: string | null;
   createdAt: string;
 };
 
@@ -57,11 +58,12 @@ export type AccountListFilter = {
 
 export type AccountCreateInput = Omit<
   AccountWithCredential,
-  "id" | "passwordHash" | "emailVerified" | "createdAt"
+  "id" | "passwordHash" | "emailVerified" | "stripeCustomerId" | "createdAt"
 > & {
   id?: string;
   passwordHash?: string | null;
   emailVerified?: string | null;
+  stripeCustomerId?: string | null;
   createdAt?: string;
 };
 
@@ -192,9 +194,19 @@ export interface TicketLedgerStore {
   ): Promise<TicketLedger | null>;
   getById(id: string): Promise<TicketLedger | null>;
   // Revocation is logical (is_active = false + revoked_at): the row stays in
-  // the ledger, so grant sync still counts it and never re-issues the grant.
+  // the ledger, so registration-grant sync still counts it and never re-issues.
   revokeById(id: string): Promise<void>;
   revokeActiveBatch(accountId: string, count: number): Promise<number>;
+}
+
+export type BillingFulfillmentCreateInput = {
+  stripeSessionId: string;
+  accountId: string;
+  ticketCount: number;
+};
+
+export interface BillingFulfillmentStore {
+  createIfAbsent(input: BillingFulfillmentCreateInput): Promise<boolean>;
 }
 
 export interface Store {
@@ -205,4 +217,5 @@ export interface Store {
   results: ResultStore;
   settings: SettingStore;
   ticketLedger: TicketLedgerStore;
+  billingFulfillments: BillingFulfillmentStore;
 }
