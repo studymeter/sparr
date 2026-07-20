@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import type {
   Account,
   AccountCreateInput,
@@ -16,6 +16,10 @@ import type {
   TicketLedgerType,
 } from "@/lib/providers";
 import { uid } from "@/lib/id";
+import { TICKET_INITIAL_GRANT_COUNT } from "@/lib/constants";
+
+type Queryable = Pool | PoolClient;
+const POSTGRES_SCHEMA_VERSION = 1;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -528,7 +532,7 @@ function createSettingStore(pool: Pool): Store["settings"] {
 }
 
 async function createTicketBatch(
-  pool: Pool,
+  db: Queryable,
   accountId: string,
   type: TicketLedgerType,
   count: number
@@ -545,7 +549,7 @@ async function createTicketBatch(
     );
     params.push(uid("tkt_"), accountId, type, nowIso());
   }
-  const result = await pool.query(
+  const result = await db.query(
     `
       INSERT INTO ticket_ledger
       (id, account_id, type, is_active, consumed_at, consumed_scenario_id, revoked_at, created_at)
@@ -557,6 +561,54 @@ async function createTicketBatch(
     params
   );
   return result.rows as TicketLedger[];
+}
+
+async function ensureRegistrationGrants(
+  pool: Pool,
+  accountId: string,
+  targetCount: number
+): Promise<number> {
+  if (targetCount <= 0) return 0;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    // Serialize concurrent ensures for the same account.
+    const locked = await client.query(
+      `SELECT id FROM account WHERE id = $1 FOR UPDATE`,
+      [accountId]
+    );
+    if ((locked.rowCount ?? 0) === 0) {
+      await client.query("ROLLBACK");
+      throw new Error("account_not_found");
+    }
+    const countResult = await client.query(
+      `
+        SELECT COUNT(*)::int AS count
+        FROM ticket_ledger
+        WHERE account_id = $1
+          AND type = 'registration_grant'
+      `,
+      [accountId]
+    );
+    const granted = Number(countResult.rows[0].count);
+    const toIssue = Math.max(0, targetCount - granted);
+    if (toIssue === 0) {
+      await client.query("COMMIT");
+      return 0;
+    }
+    await createTicketBatch(client, accountId, "registration_grant", toIssue);
+    await client.query("COMMIT");
+    return toIssue;
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // Keep the original error if rollback itself fails.
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 async function listTicketsByAccount(
@@ -695,6 +747,8 @@ function createTicketLedgerStore(pool: Pool): Store["ticketLedger"] {
   return {
     createBatch: (accountId, type, count) =>
       createTicketBatch(pool, accountId, type, count),
+    ensureRegistrationGrants: (accountId, targetCount) =>
+      ensureRegistrationGrants(pool, accountId, targetCount),
     listByAccount: (accountId, limit = 20) =>
       listTicketsByAccount(pool, accountId, limit),
     async countGranted(accountId) {
@@ -754,9 +808,43 @@ function createBillingFulfillmentStore(pool: Pool): BillingFulfillmentStore {
 }
 
 async function migrate(pool: Pool): Promise<void> {
+  await ensureSchemaMetaTable(pool);
+  const currentVersion = await readSchemaVersion(pool);
+  if (currentVersion >= POSTGRES_SCHEMA_VERSION) return;
+
   await createTables(pool);
   await applyColumnMigrations(pool);
   await seedRegistrationGrants(pool);
+  await writeSchemaVersion(pool, POSTGRES_SCHEMA_VERSION);
+}
+
+async function ensureSchemaMetaTable(pool: Pool): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS schema_meta (
+      id SMALLINT PRIMARY KEY,
+      version INTEGER NOT NULL
+    )
+  `);
+}
+
+async function readSchemaVersion(pool: Pool): Promise<number> {
+  const result = await pool.query<{ version: number }>(
+    "SELECT version FROM schema_meta WHERE id = 1"
+  );
+  if (!result.rows[0]) return 0;
+  return Number(result.rows[0].version) || 0;
+}
+
+async function writeSchemaVersion(pool: Pool, version: number): Promise<void> {
+  await pool.query(
+    `
+      INSERT INTO schema_meta (id, version)
+      VALUES (1, $1)
+      ON CONFLICT (id)
+      DO UPDATE SET version = EXCLUDED.version
+    `,
+    [version]
+  );
 }
 
 async function createTables(pool: Pool): Promise<void> {
@@ -897,29 +985,6 @@ async function seedRegistrationGrants(pool: Pool): Promise<void> {
     `
   );
   for (const row of players.rows as Array<{ id: string }>) {
-    await pool.query(
-      `
-        INSERT INTO ticket_ledger
-        (id, account_id, type, is_active, consumed_at, consumed_scenario_id, created_at)
-        VALUES ($1, $2, 'registration_grant', true, NULL, NULL, $3)
-      `,
-      [uid("tkt_seed_"), row.id, nowIso()]
-    );
-    await pool.query(
-      `
-        INSERT INTO ticket_ledger
-        (id, account_id, type, is_active, consumed_at, consumed_scenario_id, created_at)
-        VALUES ($1, $2, 'registration_grant', true, NULL, NULL, $3)
-      `,
-      [uid("tkt_seed_"), row.id, nowIso()]
-    );
-    await pool.query(
-      `
-        INSERT INTO ticket_ledger
-        (id, account_id, type, is_active, consumed_at, consumed_scenario_id, created_at)
-        VALUES ($1, $2, 'registration_grant', true, NULL, NULL, $3)
-      `,
-      [uid("tkt_seed_"), row.id, nowIso()]
-    );
+    await ensureRegistrationGrants(pool, row.id, TICKET_INITIAL_GRANT_COUNT);
   }
 }

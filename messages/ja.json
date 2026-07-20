@@ -149,9 +149,12 @@
     "thisScenario": "このシナリオ",
     "consumesTicket": "開始するとチケットを1枚消費します。",
     "startsSetup": "開始するとセットアップが始まります。",
-    "buyTicketsHint": "チケットを購入してプレイを続けられます。",
-    "buyTickets": "チケットを購入",
-    "buyTicketsRedirecting": "チェックアウトへ移動中…"
+    "buyTicketsHint": "すぐに追加購入して、プレイを続けられます。",
+    "buyTickets": "チケットを追加購入",
+    "buyTicketsRedirecting": "決済ページへ移動中…",
+    "purchaseAccepted": "購入が完了しました。残高への反映に少し時間がかかる場合があります。",
+    "purchaseCanceled": "購入をキャンセルしました。",
+    "purchaseFailed": "購入ページへ接続できませんでした。時間をおいて再度お試しください。"
   },
   "game": {
     "workMemoFallback": "作業メモ",
@@ -392,11 +395,18 @@
     "sectionLanguageDesc": "画面の表示言語を切り替えます。",
     "sectionTickets": "チケット",
     "sectionTicketsDesc": "残高と利用履歴を確認できます。",
-    "sectionSession": "ログアウト",
+    "sectionSession": "サインアウト",
     "sectionSessionDesc": "このアカウントからサインアウトします。",
     "sectionSecurityDescOAuth": "サインイン方法とパスワードの管理",
     "oauthPasswordManaged": "{provider} でサインインしています。パスワードの変更は、そのサービス側で行ってください。",
     "oauthProviderGoogle": "Google",
-    "oauthProviderUnknown": "外部認証"
+    "oauthProviderUnknown": "外部認証",
+    "buyTickets": "チケットを追加購入",
+    "buyTicketsRedirecting": "決済ページへ移動中…",
+    "purchaseAccepted": "購入が完了しました。残高への反映に少し時間がかかる場合があります。",
+    "purchaseCanceled": "購入をキャンセルしました。",
+    "purchaseFailed": "購入ページへ接続できませんでした。時間をおいて再度お試しください。",
+    "purchaseCardTitle": "チケットをすぐに追加",
+    "purchaseCardBody": "1回の購入で1枚追加されます。決済後はこの画面に戻ります。"
   }
 }

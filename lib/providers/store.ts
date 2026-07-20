@@ -185,6 +185,12 @@ export interface TicketLedgerStore {
     type: TicketLedgerType,
     count: number
   ): Promise<TicketLedger[]>;
+  // Count registration_grant rows and insert only the deficit, atomically, so
+  // concurrent syncs cannot issue more than targetCount.
+  ensureRegistrationGrants(
+    accountId: string,
+    targetCount: number
+  ): Promise<number>;
   listByAccount(accountId: string, limit?: number): Promise<TicketLedger[]>;
   countGranted(accountId: string): Promise<number>;
   countActive(accountId: string): Promise<number>;

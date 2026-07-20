@@ -102,7 +102,7 @@ Only `player` accounts use the ledger. Anonymous sessions and administrators do 
 
 When deciding whether the registration grant is still owed, only `registration_grant` rows are counted — including consumed and revoked ones, so revoking a registration ticket does not cause it to be re-issued. `purchase` and `admin_adjust` rows affect balance only.
 
-The registration grant is synchronized lazily — when a player account is created, on login, when the ticket balance is read, and immediately before consumption — so the initial three tickets are issued without a separate cron job.
+The registration grant is synchronized lazily — when a player account is created, on login, when the ticket balance is read, and immediately before consumption — and the count-and-issue step is atomic per account, so concurrent syncs cannot overshoot the registration allotment.
 
 **Consumption** — Starting a play as a logged-in player consumes the oldest active ticket for that account and records which scenario it was spent on. The ledger is the source of truth; balance is never duplicated in `ACCOUNT` or `SETTING`.
 

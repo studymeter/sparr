@@ -15,15 +15,21 @@ function requestOrigin(req: Request): string {
   return `${url.protocol}//${url.host}`;
 }
 
-async function readQuantity(req: Request): Promise<number | null> {
+type CheckoutBody = {
+  quantity?: unknown;
+  returnPath?: unknown;
+};
+
+async function readRequestBody(
+  req: Request
+): Promise<{ quantity: number | null; returnPath: "/me" | "/mypage" }> {
   try {
-    const body: unknown = await req.json();
-    if (!body || typeof body !== "object" || !("quantity" in body)) {
-      return parseTicketQuantity(undefined);
-    }
-    return parseTicketQuantity((body as { quantity: unknown }).quantity);
+    const body = (await req.json()) as CheckoutBody;
+    const quantity = parseTicketQuantity(body?.quantity);
+    const returnPath = body?.returnPath === "/mypage" ? "/mypage" : "/me";
+    return { quantity, returnPath };
   } catch {
-    return parseTicketQuantity(undefined);
+    return { quantity: parseTicketQuantity(undefined), returnPath: "/me" };
   }
 }
 
@@ -37,7 +43,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
-    const quantity = await readQuantity(req);
+    const { quantity, returnPath } = await readRequestBody(req);
     if (quantity === null) {
       return NextResponse.json({ error: "invalid_quantity" }, { status: 400 });
     }
@@ -63,6 +69,7 @@ export async function POST(req: Request) {
       stripeCustomerId: customerId,
       origin: requestOrigin(req),
       quantity,
+      returnPath,
     });
     return NextResponse.json({ url });
   } catch (err) {

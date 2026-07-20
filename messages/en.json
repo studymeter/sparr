@@ -149,9 +149,12 @@
     "thisScenario": "this scenario",
     "consumesTicket": "Starting will consume 1 ticket.",
     "startsSetup": "Starting will begin setup.",
-    "buyTicketsHint": "Buy tickets to keep playing.",
-    "buyTickets": "Buy tickets",
-    "buyTicketsRedirecting": "Redirecting to checkout…"
+    "buyTicketsHint": "Add a ticket now to keep playing right away.",
+    "buyTickets": "Buy another ticket",
+    "buyTicketsRedirecting": "Opening secure checkout…",
+    "purchaseAccepted": "Purchase completed. Your ticket balance may take a moment to update.",
+    "purchaseCanceled": "Purchase was canceled.",
+    "purchaseFailed": "Could not open the checkout page. Please try again in a moment."
   },
   "game": {
     "workMemoFallback": "Work memo",
@@ -397,6 +400,13 @@
     "sectionSecurityDescOAuth": "Sign-in method and password management",
     "oauthPasswordManaged": "You sign in with {provider}. Change your password in that service.",
     "oauthProviderGoogle": "Google",
-    "oauthProviderUnknown": "your sign-in provider"
+    "oauthProviderUnknown": "your sign-in provider",
+    "buyTickets": "Buy another ticket",
+    "buyTicketsRedirecting": "Opening secure checkout…",
+    "purchaseAccepted": "Purchase completed. Your ticket balance may take a moment to update.",
+    "purchaseCanceled": "Purchase was canceled.",
+    "purchaseFailed": "Could not open the checkout page. Please try again in a moment.",
+    "purchaseCardTitle": "Add a ticket instantly",
+    "purchaseCardBody": "Each purchase adds one ticket. You will return to this page after checkout."
   }
 }

@@ -386,32 +386,79 @@ function createSettingMethods(state: MemoryState): Store["settings"] {
   };
 }
 
+function countMemoryRegistrationGrants(
+  ticketLedger: Map<string, TicketLedger>,
+  accountId: string
+): number {
+  return [...ticketLedger.values()].filter(
+    (row) => row.accountId === accountId && row.type === "registration_grant"
+  ).length;
+}
+
+function createMemoryTicketBatch(
+  ticketLedger: Map<string, TicketLedger>,
+  accountId: string,
+  type: TicketLedger["type"],
+  count: number
+): TicketLedger[] {
+  if (count <= 0) return [];
+  const created: TicketLedger[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const row: TicketLedger = {
+      id: uid("tkt_"),
+      accountId,
+      type,
+      isActive: true,
+      consumedAt: null,
+      consumedScenarioId: null,
+      revokedAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    ticketLedger.set(row.id, row);
+    created.push(cloneTicketLedger(row));
+  }
+  return created;
+}
+
+function ensureMemoryRegistrationGrants(
+  ticketLedger: Map<string, TicketLedger>,
+  accountId: string,
+  targetCount: number
+): number {
+  if (targetCount <= 0) return 0;
+  // No await between count and insert: the body runs to completion on one
+  // turn of the event loop, so concurrent callers cannot interleave here.
+  const toIssue = Math.max(
+    0,
+    targetCount - countMemoryRegistrationGrants(ticketLedger, accountId)
+  );
+  if (toIssue === 0) return 0;
+  createMemoryTicketBatch(
+    ticketLedger,
+    accountId,
+    "registration_grant",
+    toIssue
+  );
+  return toIssue;
+}
+
 function createTicketGrantMethods(
   state: MemoryState
 ): Pick<
   Store["ticketLedger"],
-  "createBatch" | "listByAccount" | "countGranted" | "countActive"
+  | "createBatch"
+  | "ensureRegistrationGrants"
+  | "listByAccount"
+  | "countGranted"
+  | "countActive"
 > {
   const { ticketLedger } = state;
   return {
     async createBatch(accountId, type, count) {
-      if (count <= 0) return [];
-      const created: TicketLedger[] = [];
-      for (let index = 0; index < count; index += 1) {
-        const row: TicketLedger = {
-          id: uid("tkt_"),
-          accountId,
-          type,
-          isActive: true,
-          consumedAt: null,
-          consumedScenarioId: null,
-          revokedAt: null,
-          createdAt: new Date().toISOString(),
-        };
-        ticketLedger.set(row.id, row);
-        created.push(cloneTicketLedger(row));
-      }
-      return created;
+      return createMemoryTicketBatch(ticketLedger, accountId, type, count);
+    },
+    async ensureRegistrationGrants(accountId, targetCount) {
+      return ensureMemoryRegistrationGrants(ticketLedger, accountId, targetCount);
     },
     async listByAccount(accountId, limit = 20) {
       return [...ticketLedger.values()]
@@ -421,10 +468,7 @@ function createTicketGrantMethods(
         .map(cloneTicketLedger);
     },
     async countGranted(accountId) {
-      return [...ticketLedger.values()].filter(
-        (row) =>
-          row.accountId === accountId && row.type === "registration_grant"
-      ).length;
+      return countMemoryRegistrationGrants(ticketLedger, accountId);
     },
     async countActive(accountId) {
       return [...ticketLedger.values()]
