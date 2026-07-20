@@ -7,10 +7,7 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
-import {
-  formatDateTime as formatDate,
-  formatDateOnly,
-} from "@/lib/i18n/formatDate";
+import { formatDateTime as formatDate } from "@/lib/i18n/formatDate";
 import SignOutButton from "@/components/SignOutButton";
 import Footer from "@/components/Footer";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
@@ -35,7 +32,6 @@ type TicketRow = {
 
 type TicketSnapshot = {
   balance: number;
-  nextGrantAt: string;
   ledger: TicketRow[];
 };
 
@@ -530,15 +526,18 @@ function RecentSection({ recent }: { recent: RecentItem[] }) {
 }
 
 function NoTicketModal({
-  tickets,
   onClose,
+  onPurchase,
+  purchasePending,
+  purchaseError,
 }: {
-  tickets: TicketSnapshot | null;
   onClose: () => void;
+  onPurchase: () => void;
+  purchasePending: boolean;
+  purchaseError: string | null;
 }) {
   const t = useTranslations("mypage");
   const tc = useTranslations("common");
-  const locale = useLocale() as Locale;
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
@@ -547,14 +546,17 @@ function NoTicketModal({
       >
         <div className="mp-confirm-body">
           <h3 className="mp-confirm-title">{t("noTicketsTitle")}</h3>
-          <p className="mp-confirm-text">
-            {tickets?.nextGrantAt
-              ? t("nextGrant", {
-                  date: formatDateOnly(tickets.nextGrantAt, locale),
-                })
-              : t("waitForGrant")}
-          </p>
+          <p className="mp-confirm-text">{t("buyTicketsHint")}</p>
+          {purchaseError && <p className="auth-empty">{purchaseError}</p>}
           <div className="mp-confirm-actions">
+            <button
+              type="button"
+              className="btn-tertiary"
+              onClick={onPurchase}
+              disabled={purchasePending}
+            >
+              {purchasePending ? t("buyTicketsRedirecting") : t("buyTickets")}
+            </button>
             <button type="button" className="btn-primary" onClick={onClose}>
               {tc("close")}
             </button>
@@ -607,6 +609,68 @@ function ConfirmStartModal({
   );
 }
 
+function readBillingFlash(): "success" | "cancel" | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const status = params.get("billing");
+  return status === "success" || status === "cancel" ? status : null;
+}
+
+function clearBillingQueryParam(): void {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has("billing")) return;
+  params.delete("billing");
+  const next = params.toString();
+  const nextUrl = next
+    ? `${window.location.pathname}?${next}`
+    : window.location.pathname;
+  window.history.replaceState({}, "", nextUrl);
+}
+
+function BillingFlash() {
+  const [status] = useState(readBillingFlash);
+  useEffect(() => {
+    clearBillingQueryParam();
+  }, []);
+  if (status === "success") {
+    return (
+      <p className="auth-empty">
+        Purchase accepted. Ticket updates can take a moment to appear.
+      </p>
+    );
+  }
+  if (status === "cancel") {
+    return <p className="auth-empty">Purchase canceled.</p>;
+  }
+  return null;
+}
+
+function useTicketPurchase() {
+  const [purchasePending, setPurchasePending] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+
+  const purchase = async (): Promise<void> => {
+    setPurchaseError(null);
+    setPurchasePending(true);
+    try {
+      const res = await fetch("/api/player/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: 1 }),
+      });
+      if (!res.ok) throw new Error("checkout_failed");
+      const body = (await res.json()) as { url?: string };
+      if (!body.url) throw new Error("checkout_url_missing");
+      window.location.assign(body.url);
+    } catch {
+      setPurchaseError("Failed to open checkout.");
+      setPurchasePending(false);
+    }
+  };
+
+  return { purchase, purchasePending, purchaseError };
+}
+
 export default function MyPage({
   onStart,
 }: {
@@ -616,6 +680,7 @@ export default function MyPage({
   const [searchQuery, setSearchQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const start = useScenarioStart({ account, tickets, onStart });
+  const { purchase, purchasePending, purchaseError } = useTicketPurchase();
 
   return (
     <div className="mp-page">
@@ -628,6 +693,7 @@ export default function MyPage({
 
       <main className="mp-main">
         <HeroSection account={account} />
+        <BillingFlash />
         <ScenarioSection
           scenarios={scenarios}
           loading={loading}
@@ -638,7 +704,12 @@ export default function MyPage({
         {account && recent.length > 0 && <RecentSection recent={recent} />}
       </main>
       {start.showNoTicketModal && (
-        <NoTicketModal tickets={tickets} onClose={start.closeNoTicketModal} />
+        <NoTicketModal
+          onClose={start.closeNoTicketModal}
+          onPurchase={purchase}
+          purchasePending={purchasePending}
+          purchaseError={purchaseError}
+        />
       )}
       {start.pendingScenario && (
         <ConfirmStartModal

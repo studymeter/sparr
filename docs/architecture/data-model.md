@@ -11,6 +11,7 @@ erDiagram
   ACCOUNT ||--o{ RESULT : earns
   ACCOUNT ||--o{ OAUTH_ACCOUNT : "links"
   ACCOUNT ||--o{ TICKET_LEDGER : holds
+  ACCOUNT ||--o{ BILLING_FULFILLMENT : receives
   SCENARIO ||--o{ RESULT : "played in"
   SCENARIO ||--o{ PERSONA : "has"
   SCENARIO ||--o{ TICKET_LEDGER : "consumed for"
@@ -22,6 +23,7 @@ erDiagram
     string username
     string role "player / admin"
     datetime email_verified "nullable"
+    string stripe_customer_id "nullable"
     datetime created_at
   }
   OAUTH_ACCOUNT {
@@ -61,42 +63,50 @@ erDiagram
   TICKET_LEDGER {
     string id PK
     string account_id FK
-    string type "registration_grant / monthly_grant / purchase / admin_adjust"
+    string type "registration_grant / purchase / admin_adjust"
     boolean is_active
     datetime consumed_at "nullable"
     string consumed_scenario_id "nullable"
     datetime revoked_at "nullable"
     datetime created_at
   }
+  BILLING_FULFILLMENT {
+    string id PK
+    string stripe_session_id "UNIQUE"
+    string account_id FK
+    int ticket_count
+    datetime created_at
+  }
 ```
 
 ### Entities
 
-- **ACCOUNT** — A player or administrator, distinguished by `role` (`player` or `admin`). Stores `email`, `username`, `created_at` (registration time), an optional `password_hash` (bcrypt; `null` for accounts that authenticate only via OAuth), and `email_verified`. Its result history is the set of `RESULT` rows that reference it; its linked sign-in providers are its `OAUTH_ACCOUNT` rows; its playable-session credits are the `TICKET_LEDGER` rows that reference it (players only).
+- **ACCOUNT** — A player or administrator, distinguished by `role` (`player` or `admin`). Stores `email`, `username`, `created_at` (registration time), an optional `password_hash` (bcrypt; `null` for accounts that authenticate only via OAuth), `email_verified`, and an optional `stripe_customer_id` (the Stripe Customer linked to this account). Its result history is the set of `RESULT` rows that reference it; its linked sign-in providers are its `OAUTH_ACCOUNT` rows; its playable-session credits are the `TICKET_LEDGER` rows that reference it (players only).
 - **OAUTH_ACCOUNT** — A link between an `ACCOUNT` and an external OAuth provider (Auth.js calls this an `Account`; named `OAUTH_ACCOUNT` here to avoid colliding with the app's `ACCOUNT`). Holds `provider` and `provider_account_id` (the user's id at that provider). One account may link several providers.
 - **SCENARIO** — An authored scenario. Carries player-facing display fields — `title` and `description` (shown on the scenario-selection screen) — plus four prompts: `base_prompt` (the base scenario and world), `challenge_prompt` (the problem the player must solve), `documents_prompt` (how to generate the initial reference material), and `rubric_prompt` (how to score the session). Its cast is the list of `PERSONA` rows that reference it.
 - **PERSONA** — One character belonging to a scenario: `character_prompt` (personality and role setup), `voice_code` (the generative-AI voice name), and `doc_tool_enabled` (whether this character may produce work documents).
 - **RESULT** — The outcome of a finished session: `summary` (a summary of the interaction) and `evaluation` (the scored feedback). It always references the `SCENARIO` played. `account_id` is `null` for anonymous sessions; otherwise it references the `ACCOUNT` that played.
 - **SETTING** — System configuration (AI, voice, …), stored as a `key`/`value` pair with `updated_at` recording the last change.
-- **TICKET_LEDGER** — One playable-session credit for a logged-in player. Each row is a single ticket. `type` records how it was issued (`registration_grant`, `monthly_grant`, `purchase`, or `admin_adjust`). `is_active` is `true` while unused; a ticket leaves that state in one of two ways, both logical (rows are never physically deleted): **consumption** sets it to `false`, stamps `consumed_at`, and records `consumed_scenario_id` (the scenario the ticket was spent on); **revocation** (an administrator withdrawing a ticket) sets it to `false` and stamps `revoked_at`. Balance is not stored on `ACCOUNT` — it is derived as the count of active rows for that account.
+- **TICKET_LEDGER** — One playable-session credit for a logged-in player. Each row is a single ticket. `type` records how it was issued (`registration_grant`, `purchase`, or `admin_adjust`). `is_active` is `true` while unused; a ticket leaves that state in one of two ways, both logical (rows are never physically deleted): **consumption** sets it to `false`, stamps `consumed_at`, and records `consumed_scenario_id` (the scenario the ticket was spent on); **revocation** (an administrator withdrawing a ticket) sets it to `false` and stamps `revoked_at`. Balance is not stored on `ACCOUNT` — it is derived as the count of active rows for that account.
+- **BILLING_FULFILLMENT** — Idempotency record for paid ticket grants processed from Stripe webhooks. `stripe_session_id` is unique, so each Checkout session can be fulfilled at most once. On first fulfillment, the corresponding `purchase` tickets are added to `TICKET_LEDGER`.
 
 ### Tickets
 
-Only `player` accounts use the ledger. Anonymous sessions and administrators do not consume tickets.
+Only `player` accounts use the ledger. Anonymous sessions and administrators do not consume tickets. There is no subscription or plan concept — every player uses the same ledger, and paid top-ups are one-off Stripe Checkout purchases.
 
-**Grant schedule** (JST calendar days, keyed off the account's `created_at`):
+**Issuance:**
 
-- **Registration** — 3 tickets (`registration_grant`) on first sync after account creation.
-- **Recurring** — 1 ticket (`monthly_grant`) every 30 days after registration.
-- **Other types** — `purchase` (reserved for paid top-ups) and `admin_adjust` (manual credit by an administrator; a manual debit is expressed by revoking tickets, not by a ledger type).
+- **Registration** — 3 tickets (`registration_grant`) once per account, on first sync after account creation. This is the only automatic grant; there is no recurring or monthly grant.
+- **Purchase** — Additional tickets (`purchase`), one unit per ticket, bought through Stripe Checkout after payment is confirmed by webhook fulfillment. Unit price is configured in Stripe.
+- **Admin adjust** — Manual credit (`admin_adjust`) by an administrator; a manual debit is expressed by revoking tickets, not by a ledger type.
 
-When deciding how many automatic grants are still owed, only `registration_grant` and `monthly_grant` rows are counted — including consumed and revoked ones, so revoking a granted ticket does not cause the schedule to re-issue it. `purchase` and `admin_adjust` rows affect balance but do not advance that schedule.
+When deciding whether the registration grant is still owed, only `registration_grant` rows are counted — including consumed and revoked ones, so revoking a registration ticket does not cause it to be re-issued. `purchase` and `admin_adjust` rows affect balance only.
 
-Grants are synchronized lazily — when a player account is created, on login, when the ticket balance is read, and immediately before consumption — so overdue periodic grants are issued without a separate cron job.
+The registration grant is synchronized lazily — when a player account is created, on login, when the ticket balance is read, and immediately before consumption — so the initial three tickets are issued without a separate cron job.
 
 **Consumption** — Starting a play as a logged-in player consumes the oldest active ticket for that account and records which scenario it was spent on. The ledger is the source of truth; balance is never duplicated in `ACCOUNT` or `SETTING`.
 
-**Revocation** — An administrator can withdraw a player's active tickets. Revocation is logical: the row stays in the ledger with `is_active` set to `false` and `revoked_at` stamped, preserving the audit trail and keeping the grant schedule from re-issuing revoked grants.
+**Revocation** — An administrator can withdraw a player's active tickets. Revocation is logical: the row stays in the ledger with `is_active` set to `false` and `revoked_at` stamped, preserving the audit trail and keeping the registration grant from being re-issued.
 
 > Authentication sessions are **not** persisted: Auth.js uses JWT sessions (a signed, stateless cookie), so there is no session table. (This is distinct from the per-playthrough session state below.)
 

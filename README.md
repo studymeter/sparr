@@ -21,7 +21,6 @@ chmod +x .claude/hooks/*.sh                # Claude Code: pre-tool guard hooks
 bash scripts/bootstrap-cursor-hooks.sh     # Cursor: rules + local hooks
 ```
 
-
 ## Docker
 
 Requires [Docker Engine](https://docs.docker.com/engine/install/) and Compose V2.
@@ -46,6 +45,13 @@ For PostgreSQL instead of SQLite, add to `.env`:
 ```bash
 STORE_PROVIDER=postgres
 POSTGRES_DATABASE_URL=postgres://sparr:sparr@postgres:5432/sparr
+```
+
+For Supabase (hosted PostgreSQL), use:
+
+```bash
+STORE_PROVIDER=supabase
+SUPABASE_DATABASE_URL=<Supabase Database connection string>
 ```
 
 Then start with the Postgres profile:
@@ -74,16 +80,17 @@ When `AUTH_PROVIDER=authjs`, also set `AUTH_SECRET` (and `AUTH_GOOGLE_ID` / `AUT
 
 ### Optional
 
-| Variable                | Description                                          | Default          |
-| ----------------------- | ---------------------------------------------------- | ---------------- |
-| `OPENAI_TEXT_MODEL`     | Setup / document / scoring generation                | `gpt-5.2`        |
-| `OPENAI_REALTIME_MODEL` | Voice (calls)                                        | `gpt-realtime-2` |
-| `OPENAI_VAD_*`          | Voice-activity-detection tuning                      | optional         |
-| `AI_PROVIDER`           | `openai` / `fake`                                    | `openai`         |
-| `VOICE_PROVIDER`        | Voice-issuing adapter                                | `openai`         |
-| `STORE_PROVIDER`        | `sqlite` / `memory` / `postgres`                     | `sqlite`         |
-| `SQLITE_PATH`           | SQLite DB file path                                  | `./data/demo.db` |
-| `POSTGRES_DATABASE_URL` | Postgres connection (when `STORE_PROVIDER=postgres`) | optional         |
+| Variable                | Description                                                   | Default          |
+| ----------------------- | ------------------------------------------------------------- | ---------------- |
+| `OPENAI_TEXT_MODEL`     | Setup / document / scoring generation                         | `gpt-5.2`        |
+| `OPENAI_REALTIME_MODEL` | Voice (calls)                                                 | `gpt-realtime-2` |
+| `OPENAI_VAD_*`          | Voice-activity-detection tuning                               | optional         |
+| `AI_PROVIDER`           | `openai` / `fake`                                             | `openai`         |
+| `VOICE_PROVIDER`        | Voice-issuing adapter                                         | `openai`         |
+| `STORE_PROVIDER`        | `sqlite` / `memory` / `postgres` / `supabase`                 | `sqlite`         |
+| `SQLITE_PATH`           | SQLite DB file path                                           | `./data/demo.db` |
+| `POSTGRES_DATABASE_URL` | Postgres connection (when `STORE_PROVIDER=postgres`)          | optional         |
+| `SUPABASE_DATABASE_URL` | Supabase Postgres connection (when `STORE_PROVIDER=supabase`) | optional         |
 
 Keep `OPENAI_API_KEY` server-side. Never put keys, tokens, or secrets under `NEXT_PUBLIC_` (they get baked into the client bundle).
 

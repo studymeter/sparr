@@ -90,6 +90,14 @@ async function pickStore(): Promise<Store> {
         storeSingleton = await createPostgresStore(databaseUrl);
         break;
       }
+      case "supabase": {
+        const databaseUrl = process.env.SUPABASE_DATABASE_URL;
+        if (!databaseUrl) {
+          throw new Error("SUPABASE_DATABASE_URL is not set");
+        }
+        storeSingleton = await createPostgresStore(databaseUrl);
+        break;
+      }
       case "sqlite":
       default: {
         const dbPath = process.env.SQLITE_PATH || "./data/demo.db";

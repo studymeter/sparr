@@ -41,7 +41,7 @@ The player- and admin-facing surfaces. Routable pages live under `app/` (App Rou
 
 ## Endpoints
 
-Server entry points the UI calls; each keeps sensitive material on the server. Player endpoints live under `app/api/player/`, admin endpoints under `app/api/admin/`. Authentication endpoints (sign-up, sign-in/out, password change, session validation) are shared by both roles and live under `app/api/auth/`; only each role's OAuth sign-in entry points live under its own path.
+Server entry points the UI calls; each keeps sensitive material on the server. Player endpoints live under `app/api/player/`, admin endpoints under `app/api/admin/`. Authentication endpoints (sign-up, sign-in/out, password change, session validation) are shared by both roles and live under `app/api/auth/`; only each role's OAuth sign-in entry points live under its own path. External webhook endpoints (for example Stripe) live under `app/api/webhooks/` and verify request signatures before mutating state.
 
 ### Player
 
@@ -49,7 +49,8 @@ Server entry points the UI calls; each keeps sensitive material on the server. P
 | ---------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Authentication   | `app/api/auth/`, `app/api/player/` | Sign-up, sign-in/out, password change, and session validation (shared); the player OAuth sign-in entry points; registration validates input and hashes the password |
 | Account settings | `app/api/player/`                  | Reads and updates the player's own profile and preferences                                                                                                          |
-| Tickets          | `app/api/player/`                  | Returns the player's own ticket balance, next grant date, and grant/consumption history                                                                             |
+| Tickets          | `app/api/player/`                  | Returns the player's own ticket balance and grant/consumption history                                                                                               |
+| Billing          | `app/api/player/`                  | Starts Stripe Checkout for one-off ticket purchases (unit price) for authenticated players                                                                          |
 | Session issuance | `app/api/player/`                  | Mints a short-lived credential and the real-time session config; assembles the system instructions server-side and never sends the hidden truth to the client       |
 | Scenario setup   | `app/api/player/`                  | Generates the scenario instance — situation, cast, initial documents, metadata, and the hidden root cause — from the scenario's prompts                             |
 | Tool execution   | `app/api/player/`                  | Runs a tool a role invokes during a conversation, such as generating a work document                                                                                |

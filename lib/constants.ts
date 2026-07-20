@@ -31,8 +31,5 @@ export const SCORE_A_MIN = 70;
 export const SCORE_B_MIN = 50;
 export const SCORE_C_MIN = 30;
 
-// tickets: 登録日から次回付与までの間隔 (ms)
-export const TICKET_GRANT_INTERVAL_MS = 30 * 24 * 60 * 60 * 1000;
-
-// tickets: 登録時の初回付与枚数
+// tickets: 登録時の初回付与枚数（生涯・定期付与なし）
 export const TICKET_INITIAL_GRANT_COUNT = 3;

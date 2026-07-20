@@ -640,7 +640,7 @@ paths:
         2. Verify role=admin (403 if not admin)
         3. Look up the target account (404 "not_found" if it does not exist)
         4. Return 400 "not_a_player" if the account is not a player
-        5. Return the TicketSnapshot (balance / nextGrantAt / ledger) with 200
+        5. Return the TicketSnapshot (balance / ledger) with 200
       operationId: getAdminUserTickets
       security:
         - SessionCookie: []
@@ -1753,7 +1753,7 @@ components:
           type: string
         type:
           type: string
-          enum: [registration_grant, monthly_grant, purchase, admin_adjust]
+          enum: [registration_grant, purchase, admin_adjust]
         isActive:
           type: boolean
         consumedAt:
@@ -1770,14 +1770,11 @@ components:
 
     TicketSnapshot:
       type: object
-      required: [balance, nextGrantAt, ledger]
+      required: [balance, ledger]
       properties:
         balance:
           type: integer
           description: Count of currently active (unconsumed, non-revoked) tickets
-        nextGrantAt:
-          type: string
-          description: ISO timestamp of the next scheduled grant
         ledger:
           type: array
           items:
@@ -1786,14 +1783,11 @@ components:
 
     TicketRevokeResult:
       type: object
-      required: [balance, nextGrantAt, ledger, deletedCount]
+      required: [balance, ledger, deletedCount]
       properties:
         balance:
           type: integer
           description: Count of currently active tickets after the revoke
-        nextGrantAt:
-          type: string
-          description: ISO timestamp of the next scheduled grant
         ledger:
           type: array
           items:

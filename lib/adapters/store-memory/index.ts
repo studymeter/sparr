@@ -2,6 +2,7 @@ import {
   type Account,
   type AccountCreateInput,
   type AccountWithCredential,
+  type BillingFulfillmentCreateInput,
   type OAuthAccount,
   type OAuthAccountCreateInput,
   type Persona,
@@ -41,6 +42,12 @@ function cloneTicketLedger(row: TicketLedger): TicketLedger {
   return { ...row };
 }
 
+function cloneBillingFulfillmentInput(
+  row: BillingFulfillmentCreateInput
+): BillingFulfillmentCreateInput {
+  return { ...row };
+}
+
 type MemoryStoreSeed = {
   accounts?: AccountWithCredential[];
   oauthAccounts?: OAuthAccount[];
@@ -49,6 +56,7 @@ type MemoryStoreSeed = {
   results?: Result[];
   settings?: Setting[];
   ticketLedger?: TicketLedger[];
+  billingFulfillments?: BillingFulfillmentCreateInput[];
 };
 
 type MemoryState = {
@@ -61,6 +69,7 @@ type MemoryState = {
   results: Map<string, Result>;
   settings: Map<string, Setting>;
   ticketLedger: Map<string, TicketLedger>;
+  billingFulfillments: Map<string, BillingFulfillmentCreateInput>;
 };
 
 function createMemoryState(): MemoryState {
@@ -74,6 +83,7 @@ function createMemoryState(): MemoryState {
     results: new Map<string, Result>(),
     settings: new Map<string, Setting>(),
     ticketLedger: new Map<string, TicketLedger>(),
+    billingFulfillments: new Map<string, BillingFulfillmentCreateInput>(),
   };
 }
 
@@ -105,6 +115,12 @@ function seedConfigRows(state: MemoryState, seed?: MemoryStoreSeed): void {
     state.settings.set(setting.key, { ...setting });
   for (const row of seed?.ticketLedger ?? [])
     state.ticketLedger.set(row.id, cloneTicketLedger(row));
+  for (const row of seed?.billingFulfillments ?? []) {
+    state.billingFulfillments.set(
+      row.stripeSessionId,
+      cloneBillingFulfillmentInput(row)
+    );
+  }
 }
 
 function createAccountWriteMethods(
@@ -122,6 +138,7 @@ function createAccountWriteMethods(
         username: input.username,
         role: input.role,
         emailVerified: input.emailVerified ?? null,
+        stripeCustomerId: input.stripeCustomerId ?? null,
         createdAt: input.createdAt ?? new Date().toISOString(),
         passwordHash: input.passwordHash ?? null,
       };
@@ -406,8 +423,7 @@ function createTicketGrantMethods(
     async countGranted(accountId) {
       return [...ticketLedger.values()].filter(
         (row) =>
-          row.accountId === accountId &&
-          (row.type === "registration_grant" || row.type === "monthly_grant")
+          row.accountId === accountId && row.type === "registration_grant"
       ).length;
     },
     async countActive(accountId) {
@@ -447,7 +463,7 @@ function createTicketConsumeMethods(
       return row ? cloneTicketLedger(row) : null;
     },
     // Revocation is logical (isActive = false + revokedAt): the row stays in
-    // the ledger, so grant sync still counts it and never re-issues it.
+    // the ledger, so registration-grant sync still counts it and never re-issues.
     async revokeById(id) {
       const row = ticketLedger.get(id);
       if (!row || !row.isActive) return;
@@ -478,6 +494,22 @@ function createTicketLedgerMethods(state: MemoryState): Store["ticketLedger"] {
   };
 }
 
+function createBillingFulfillmentMethods(
+  state: MemoryState
+): Store["billingFulfillments"] {
+  const { billingFulfillments } = state;
+  return {
+    async createIfAbsent(input) {
+      if (billingFulfillments.has(input.stripeSessionId)) return false;
+      billingFulfillments.set(
+        input.stripeSessionId,
+        cloneBillingFulfillmentInput(input)
+      );
+      return true;
+    },
+  };
+}
+
 export function createMemoryStore(seed?: MemoryStoreSeed): Store {
   const state = createMemoryState();
   seedAccountRows(state, seed);
@@ -492,5 +524,6 @@ export function createMemoryStore(seed?: MemoryStoreSeed): Store {
     results: createResultMethods(state),
     settings: createSettingMethods(state),
     ticketLedger: createTicketLedgerMethods(state),
+    billingFulfillments: createBillingFulfillmentMethods(state),
   };
 }
