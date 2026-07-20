@@ -28,6 +28,7 @@ import type {
 } from "@/lib/providers";
 import { uid } from "@/lib/id";
 import { buildDemoPersonas, buildDemoScenario } from "@/lib/store/demoScenario";
+import { TICKET_INITIAL_GRANT_COUNT } from "@/lib/constants";
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -663,6 +664,43 @@ function createTicketBatch(
   return created;
 }
 
+function countRegistrationGrants(
+  db: Database.Database,
+  accountId: string
+): number {
+  const row = db
+    .prepare(
+      `
+        SELECT COUNT(*) as count
+        FROM ticket_ledger
+        WHERE account_id = ?
+          AND type = 'registration_grant'
+      `
+    )
+    .get(accountId) as { count: number };
+  return row.count;
+}
+
+function ensureRegistrationGrants(
+  db: Database.Database,
+  accountId: string,
+  targetCount: number
+): number {
+  if (targetCount <= 0) return 0;
+  // better-sqlite3 transactions serialize writers, so concurrent ensure calls
+  // for the same DB cannot both observe a deficit and double-issue.
+  const run = db.transaction(() => {
+    const toIssue = Math.max(
+      0,
+      targetCount - countRegistrationGrants(db, accountId)
+    );
+    if (toIssue === 0) return 0;
+    createTicketBatch(db, accountId, "registration_grant", toIssue);
+    return toIssue;
+  });
+  return run();
+}
+
 function listTicketsByAccount(
   db: Database.Database,
   accountId: string,
@@ -789,21 +827,14 @@ function createTicketLedgerStore(db: Database.Database): TicketLedgerStore {
     async createBatch(accountId, type, count) {
       return createTicketBatch(db, accountId, type, count);
     },
+    async ensureRegistrationGrants(accountId, targetCount) {
+      return ensureRegistrationGrants(db, accountId, targetCount);
+    },
     async listByAccount(accountId, limit = 20) {
       return listTicketsByAccount(db, accountId, limit);
     },
     async countGranted(accountId) {
-      const row = db
-        .prepare(
-          `
-            SELECT COUNT(*) as count
-            FROM ticket_ledger
-            WHERE account_id = ?
-              AND type = 'registration_grant'
-          `
-        )
-        .get(accountId) as { count: number };
-      return row.count;
+      return countRegistrationGrants(db, accountId);
     },
     async countActive(accountId) {
       const row = db
@@ -1108,17 +1139,8 @@ function seedTicketsForPlayers(db: Database.Database): void {
       `
     )
     .all() as Array<{ id: string }>;
-  const insertSeed = db.prepare(
-    `
-      INSERT INTO ticket_ledger
-      (id, account_id, type, is_active, consumed_at, consumed_scenario_id, created_at)
-      VALUES (?, ?, 'registration_grant', 1, NULL, NULL, ?)
-    `
-  );
   for (const player of players) {
-    insertSeed.run(uid("tkt_seed_"), player.id, nowIso());
-    insertSeed.run(uid("tkt_seed_"), player.id, nowIso());
-    insertSeed.run(uid("tkt_seed_"), player.id, nowIso());
+    ensureRegistrationGrants(db, player.id, TICKET_INITIAL_GRANT_COUNT);
   }
 }
 

@@ -405,19 +405,16 @@ function ScenarioList({
 
 function ScenarioSection({
   scenarios,
-  loading,
   searchQuery,
   setSearchQuery,
   onSelect,
 }: {
   scenarios: ScenarioCard[];
-  loading: boolean;
   searchQuery: string;
   setSearchQuery: (value: string) => void;
   onSelect: (scenario: ScenarioCard) => void;
 }) {
   const t = useTranslations("mypage");
-  const tc = useTranslations("common");
   const filteredScenarios = scenarios.filter((sc) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -439,9 +436,7 @@ function ScenarioSection({
           onChange={(ev) => setSearchQuery(ev.target.value)}
         />
       </div>
-      {loading ? (
-        <p className="auth-empty">{tc("loading")}</p>
-      ) : filteredScenarios.length === 0 ? (
+      {filteredScenarios.length === 0 ? (
         <p className="auth-empty">
           {scenarios.length === 0 ? t("noScenarios") : t("noMatchingScenarios")}
         </p>
@@ -628,26 +623,43 @@ function clearBillingQueryParam(): void {
 }
 
 function BillingFlash() {
+  const t = useTranslations("mypage");
   const [status] = useState(readBillingFlash);
   useEffect(() => {
     clearBillingQueryParam();
   }, []);
   if (status === "success") {
     return (
-      <p className="auth-empty">
-        Purchase accepted. Ticket updates can take a moment to appear.
+      <p className="mp-billing-flash mp-billing-flash-success">
+        {t("purchaseAccepted")}
       </p>
     );
   }
   if (status === "cancel") {
-    return <p className="auth-empty">Purchase canceled.</p>;
+    return (
+      <p className="mp-billing-flash mp-billing-flash-muted">
+        {t("purchaseCanceled")}
+      </p>
+    );
   }
   return null;
 }
 
 function useTicketPurchase() {
+  const t = useTranslations("mypage");
   const [purchasePending, setPurchasePending] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onPageShow = (): void => {
+      // Browser back/forward cache can keep stale local state.
+      setPurchasePending(false);
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+    };
+  }, []);
 
   const purchase = async (): Promise<void> => {
     setPurchaseError(null);
@@ -663,12 +675,22 @@ function useTicketPurchase() {
       if (!body.url) throw new Error("checkout_url_missing");
       window.location.assign(body.url);
     } catch {
-      setPurchaseError("Failed to open checkout.");
+      setPurchaseError(t("purchaseFailed"));
       setPurchasePending(false);
     }
   };
 
   return { purchase, purchasePending, purchaseError };
+}
+
+function MyPageLoading() {
+  const tc = useTranslations("common");
+  return (
+    <div className="mp-loading" role="status" aria-busy="true">
+      <BrandLogo className="mp-loading-logo" />
+      <span className="mp-loading-label">{tc("loading")}</span>
+    </div>
+  );
 }
 
 export default function MyPage({
@@ -681,6 +703,8 @@ export default function MyPage({
   const [menuOpen, setMenuOpen] = useState(false);
   const start = useScenarioStart({ account, tickets, onStart });
   const { purchase, purchasePending, purchaseError } = useTicketPurchase();
+
+  if (loading) return <MyPageLoading />;
 
   return (
     <div className="mp-page">
@@ -696,7 +720,6 @@ export default function MyPage({
         <BillingFlash />
         <ScenarioSection
           scenarios={scenarios}
-          loading={loading}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           onSelect={start.handleStartScenario}

@@ -14,14 +14,9 @@ export async function syncTicketGrants(
   const account = await store.accounts.get(accountId);
   if (!account) throw new Error("account_not_found");
 
-  const grantsIssued = await store.ticketLedger.countGranted(accountId);
-  const toIssue = Math.max(0, TICKET_INITIAL_GRANT_COUNT - grantsIssued);
-  if (toIssue === 0) return;
-
-  await store.ticketLedger.createBatch(
+  await store.ticketLedger.ensureRegistrationGrants(
     accountId,
-    "registration_grant",
-    toIssue
+    TICKET_INITIAL_GRANT_COUNT
   );
 }
 

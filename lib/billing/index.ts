@@ -40,11 +40,18 @@ type CheckoutInput = {
   stripeCustomerId: string | null;
   origin: string;
   quantity: number;
+  returnPath?: string;
 };
+
+function resolveReturnPath(path?: string): "/me" | "/mypage" {
+  if (path === "/mypage") return "/mypage";
+  return "/me";
+}
 
 export async function createTicketCheckout(
   input: CheckoutInput
 ): Promise<string> {
+  const returnPath = resolveReturnPath(input.returnPath);
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
     {
       price: ticketUnitPriceId(),
@@ -55,8 +62,8 @@ export async function createTicketCheckout(
     mode: "payment",
     line_items: lineItems,
     client_reference_id: input.accountId,
-    success_url: `${input.origin}/me?billing=success`,
-    cancel_url: `${input.origin}/me?billing=cancel`,
+    success_url: `${input.origin}${returnPath}?billing=success`,
+    cancel_url: `${input.origin}${returnPath}?billing=cancel`,
     metadata: {
       accountId: input.accountId,
       ticketCount: String(input.quantity),

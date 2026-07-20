@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
@@ -92,6 +92,12 @@ function useAccountSettings() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
+  const refreshTickets = useCallback(async (): Promise<void> => {
+    const ticketRes = await fetch("/api/player/tickets");
+    if (!ticketRes.ok) return;
+    setTickets((await ticketRes.json()) as TicketSnapshot);
+  }, []);
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -105,10 +111,7 @@ function useAccountSettings() {
         const data = (await res.json()) as Account;
         setAccount(data);
         setUsername(data.username);
-        const ticketRes = await fetch("/api/player/tickets");
-        if (active && ticketRes.ok) {
-          setTickets((await ticketRes.json()) as TicketSnapshot);
-        }
+        await refreshTickets();
       }
       setStatus("ready");
     })();
@@ -129,7 +132,14 @@ function useAccountSettings() {
     setError,
     saved,
     setSaved,
+    refreshTickets,
   };
+}
+
+function hasBillingResultParam(): boolean {
+  if (typeof window === "undefined") return false;
+  const status = new URLSearchParams(window.location.search).get("billing");
+  return status === "success" || status === "cancel";
 }
 
 function SettingsTabBar({
@@ -307,19 +317,58 @@ function TicketTable({
 function TicketsPanel({
   tickets,
   locale,
+  t,
   ta,
   tc,
+  onPurchase,
+  isPurchasing,
+  purchaseError,
+  purchaseStatus,
 }: {
   tickets: TicketSnapshot | null;
   locale: Locale;
+  t: TUserMypage;
   ta: TAccount;
   tc: TCommon;
+  onPurchase: () => void;
+  isPurchasing: boolean;
+  purchaseError: string | null;
+  purchaseStatus: "success" | "cancel" | null;
 }) {
   if (!tickets) {
     return <p className="auth-empty">{tc("loading")}</p>;
   }
   return (
     <>
+      <div className="mypage-purchase-card">
+        <div className="mypage-purchase-card-head">
+          <p className="mypage-purchase-card-title">{t("purchaseCardTitle")}</p>
+          <p className="mypage-purchase-card-body">{t("purchaseCardBody")}</p>
+        </div>
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={onPurchase}
+          disabled={isPurchasing}
+        >
+          {isPurchasing ? t("buyTicketsRedirecting") : t("buyTickets")}
+        </button>
+      </div>
+      {purchaseStatus === "success" ? (
+        <p className="mypage-purchase-feedback mypage-purchase-feedback-ok">
+          {t("purchaseAccepted")}
+        </p>
+      ) : null}
+      {purchaseStatus === "cancel" ? (
+        <p className="mypage-purchase-feedback mypage-purchase-feedback-muted">
+          {t("purchaseCanceled")}
+        </p>
+      ) : null}
+      {purchaseError ? (
+        <p className="mypage-purchase-feedback mypage-purchase-feedback-error">
+          {purchaseError}
+        </p>
+      ) : null}
       <div className="mypage-settings-ticket-summary">
         <div className="mypage-settings-stat">
           <span className="mypage-settings-stat-label">
@@ -348,6 +397,10 @@ type FolderProps = {
   settings: AccountSettings;
   locale: Locale;
   onSubmit: (event: React.FormEvent) => void;
+  onPurchase: () => void;
+  isPurchasing: boolean;
+  purchaseError: string | null;
+  purchaseStatus: "success" | "cancel" | null;
   t: TUserMypage;
   ta: TAccount;
   tc: TCommon;
@@ -359,6 +412,10 @@ function SettingsPanel({
   settings,
   locale,
   onSubmit,
+  onPurchase,
+  isPurchasing,
+  purchaseError,
+  purchaseStatus,
   t,
   ta,
   tc,
@@ -368,6 +425,10 @@ function SettingsPanel({
   settings: AccountSettings;
   locale: Locale;
   onSubmit: (event: React.FormEvent) => void;
+  onPurchase: () => void;
+  isPurchasing: boolean;
+  purchaseError: string | null;
+  purchaseStatus: "success" | "cancel" | null;
   t: TUserMypage;
   ta: TAccount;
   tc: TCommon;
@@ -394,8 +455,13 @@ function SettingsPanel({
       <TicketsPanel
         tickets={settings.tickets}
         locale={locale}
+        t={t}
         ta={ta}
         tc={tc}
+        onPurchase={onPurchase}
+        isPurchasing={isPurchasing}
+        purchaseError={purchaseError}
+        purchaseStatus={purchaseStatus}
       />
     );
   }
@@ -425,6 +491,10 @@ function SettingsFolder(props: FolderProps) {
             settings={settings}
             locale={props.locale}
             onSubmit={props.onSubmit}
+            onPurchase={props.onPurchase}
+            isPurchasing={props.isPurchasing}
+            purchaseError={props.purchaseError}
+            purchaseStatus={props.purchaseStatus}
             t={t}
             ta={props.ta}
             tc={props.tc}
@@ -443,7 +513,45 @@ export default function MyPageSettings() {
   const tauth = useTranslations("auth");
   const locale = useLocale() as Locale;
   const [activeTab, setActiveTab] = useState<SettingsTab>("tickets");
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [purchaseStatus, setPurchaseStatus] = useState<
+    "success" | "cancel" | null
+  >(null);
   const settings = useAccountSettings();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("billing");
+    if (status === "success" || status === "cancel") {
+      setPurchaseStatus(status);
+      setIsPurchasing(false);
+      if (status === "success") {
+        void settings.refreshTickets();
+      }
+      params.delete("billing");
+      const next = params.toString();
+      const nextUrl = next
+        ? `${window.location.pathname}?${next}`
+        : window.location.pathname;
+      window.history.replaceState({}, "", nextUrl);
+    }
+  }, [settings.refreshTickets]);
+
+  useEffect(() => {
+    const onPageShow = (): void => {
+      // Browser back/forward cache can restore "purchasing" state.
+      if (hasBillingResultParam()) {
+        setIsPurchasing(false);
+        return;
+      }
+      setIsPurchasing(false);
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+    };
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -461,6 +569,25 @@ export default function MyPageSettings() {
       return;
     }
     settings.setSaved(true);
+  };
+
+  const handlePurchase = async (): Promise<void> => {
+    setPurchaseError(null);
+    setIsPurchasing(true);
+    try {
+      const res = await fetch("/api/player/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ returnPath: "/mypage" }),
+      });
+      if (!res.ok) throw new Error("checkout_failed");
+      const body = (await res.json()) as { url?: string };
+      if (!body.url) throw new Error("checkout_url_missing");
+      window.location.assign(body.url);
+    } catch {
+      setPurchaseError(t("purchaseFailed"));
+      setIsPurchasing(false);
+    }
   };
 
   return (
@@ -488,6 +615,10 @@ export default function MyPageSettings() {
           settings={settings}
           locale={locale}
           onSubmit={handleSubmit}
+          onPurchase={handlePurchase}
+          isPurchasing={isPurchasing}
+          purchaseError={purchaseError}
+          purchaseStatus={purchaseStatus}
           t={t}
           ta={ta}
           tc={tc}
