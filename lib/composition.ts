@@ -17,6 +17,16 @@ import type {
   VoiceProvider,
 } from "@/lib/providers";
 
+// Active auth provider name. Shared so the startup guard and per-request
+// guards agree on when the app is running in anonymous mode.
+const authProviderName = process.env.AUTH_PROVIDER || "none";
+
+// Anonymous requests are legitimate only in anonymous mode (AUTH_PROVIDER=none).
+// With a real provider (authjs) an unauthenticated request must be rejected on
+// protected endpoints — selecting a provider does not gate per-request access
+// by itself, so endpoints check this flag explicitly.
+export const authAllowsAnonymous = authProviderName === "none";
+
 function pickAIProvider(): AIProvider {
   const provider = process.env.AI_PROVIDER || "openai";
   switch (provider) {
@@ -38,7 +48,7 @@ function pickVoiceProvider(): VoiceProvider {
 }
 
 function pickAuthProvider(): AuthProvider {
-  const provider = process.env.AUTH_PROVIDER || "none";
+  const provider = authProviderName;
   const isProductionBuild = process.env.NEXT_PHASE === "phase-production-build";
   // Secure by default: anonymous (AUTH_PROVIDER=none) is blocked in production.
   // Opt in explicitly with AUTH_ALLOW_ANONYMOUS=true to run the anonymous demo in production.
