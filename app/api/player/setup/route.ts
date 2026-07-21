@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { providers } from "@/lib/composition";
+import { requireAuthenticated } from "@/lib/api/principal";
 import { consumeTicket, InsufficientTicketsError } from "@/lib/tickets";
 import type { Store } from "@/lib/providers";
 
@@ -43,6 +44,10 @@ export async function POST(req: Request) {
     }
     const store = await providers.getStore();
     const principal = await providers.auth.getPrincipal();
+    // Generating a setup calls the AI provider (OpenAI cost) — gate anonymous
+    // callers unless the deployment runs in anonymous mode.
+    const authError = requireAuthenticated(principal);
+    if (authError) return authError;
     if (principal.role === "player") {
       const ticketError = await consumePlayerTicket(
         store,

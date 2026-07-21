@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { providers } from "@/lib/composition";
+import { getPrincipal, requireAuthenticated } from "@/lib/api/principal";
 import { assembleSystemPrompt } from "@/lib/prompts/assemble";
 import type { CallLogs, Doc, Project, Stakeholder } from "@/lib/types";
 
@@ -16,6 +17,11 @@ type Body = {
 
 export async function POST(req: Request) {
   try {
+    // Issues an ephemeral OpenAI Realtime key — never open to the public unless
+    // the deployment runs in anonymous mode.
+    const authError = requireAuthenticated(await getPrincipal());
+    if (authError) return authError;
+
     const body = (await req.json()) as Body;
     const { stakeholderId, project, stakeholders, documents, callLogs } = body;
 

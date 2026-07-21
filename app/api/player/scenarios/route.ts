@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { providers } from "@/lib/composition";
+import { getPrincipal, requireAuthenticated } from "@/lib/api/principal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const authError = requireAuthenticated(await getPrincipal());
+    if (authError) return authError;
+
     const store = await providers.getStore();
     const scenarios = await store.scenarios.list();
     // Selection screen needs only display fields — never ship the prompts to the client.

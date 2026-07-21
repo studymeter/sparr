@@ -242,9 +242,10 @@ paths:
           description: Redirect to the Auth.js callback handler
 
   # -- Gameplay ----------------------------------------------------
-  # During the MVP period with AUTH_PROVIDER=none, these endpoints
-  # are accessible without authentication.
-  # Authentication (security) will be added after AuthProvider is introduced.
+  # These endpoints require an authenticated principal and return 401 to
+  # anonymous callers. The one exception is anonymous mode (AUTH_PROVIDER=none,
+  # opted into for production via AUTH_ALLOW_ANONYMOUS=true): there every request
+  # is anonymous by design, so the 401 gate is disabled and they stay open.
 
   /api/player/setup:
     post:
@@ -265,6 +266,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SetupResponse"
+        "401":
+          description: Unauthenticated (unless anonymous mode is enabled)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: AI generation failed
           content:
@@ -289,6 +296,12 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ScenarioSummary"
+        "401":
+          description: Unauthenticated (unless anonymous mode is enabled)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Store retrieval failed
           content:
@@ -318,6 +331,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StoredScenario"
+        "401":
+          description: Unauthenticated (unless anonymous mode is enabled)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Scenario not found
           content:
@@ -357,6 +376,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RealtimeSessionResponse"
+        "401":
+          description: Unauthenticated (unless anonymous mode is enabled)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "400":
           description: Bad request (missing required field or stakeholderId mismatch)
           content:
@@ -395,6 +420,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GeneratedDocument"
+        "401":
+          description: Unauthenticated (unless anonymous mode is enabled)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: AI generation failed
           content:
@@ -426,6 +457,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ScoreResult"
+        "401":
+          description: Unauthenticated (unless anonymous mode is enabled)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: AI generation failed
           content:
