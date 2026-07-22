@@ -266,19 +266,6 @@ button {
 .home-title {
   font-weight: 800;
 }
-/* タイトル画面 左上のスタディメーターロゴ */
-.brand-logo {
-  position: absolute;
-  top: 22px;
-  left: 26px;
-  display: block;
-  line-height: 0;
-}
-.brand-logo img {
-  height: 30px;
-  width: auto;
-  display: block;
-}
 .home-brand a {
   display: block;
   line-height: 0;
