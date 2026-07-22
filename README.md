@@ -95,6 +95,26 @@ When `AUTH_PROVIDER=authjs`, also set `AUTH_SECRET` (and `AUTH_GOOGLE_ID` / `AUT
 
 Keep `OPENAI_API_KEY` server-side. Never put keys, tokens, or secrets under `NEXT_PUBLIC_` (they get baked into the client bundle).
 
+### Creating the first admin
+
+Only relevant when `AUTH_PROVIDER=authjs`. Sign-up always creates a `player`, and promoting a user to `admin` is itself an admin-only action (the admin dashboard, or `POST /api/admin/users/{id}` with `{ "role": "admin" }`). That leaves a chicken-and-egg for the very first admin: there is no bootstrap env var or seed, so you flip the role directly in the store.
+
+Register the account normally, then update its row in the `account` table (column `role`, values `player` / `admin`).
+
+SQLite (default store, `SQLITE_PATH` = `./data/demo.db`):
+
+```bash
+sqlite3 ./data/demo.db "UPDATE account SET role='admin' WHERE email='you@example.com';"
+```
+
+PostgreSQL / Supabase — the same statement against the `account` table:
+
+```sql
+UPDATE account SET role='admin' WHERE email='you@example.com';
+```
+
+The role is carried in the session token, so **sign out and back in** for the change to take effect. Afterwards you can manage every other user's role from the admin dashboard.
+
 ## How a roleplay works
 
 A session runs as a loop you can repeat as often as you like:
