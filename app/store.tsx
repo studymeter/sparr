@@ -36,8 +36,9 @@ type GameContextValue = {
   setupFromResponse: (res: SetupResponse) => void;
   addGeneratedDoc: (doc: { title: string; body: string }) => Doc;
   appendCallLog: (stakeholderId: string, turns: CallTurn[]) => void;
-  // 資料作成依頼。コールを切っても完成する（生成はアプリ常駐のストア側で進む）
-  requestDocument: (request: string) => void;
+  // 資料作成依頼。コールを切っても完成する（生成はアプリ常駐のストア側で進む）。
+  // onError は生成に失敗した場合に呼ばれる（呼び出し元でのトースト表示などに使う）。
+  requestDocument: (request: string, onError?: () => void) => void;
   reset: () => void;
 };
 
@@ -126,11 +127,14 @@ function withAppendedLog(
   };
 }
 
-// 依頼後にコールを切って画面を離れても資料は完成して届く（生成はストア側で非同期に進む）
+// 依頼後にコールを切って画面を離れても資料は完成して届く（生成はストア側で非同期に進む）。
+// サーバがエラーを返した場合や本文が空だった場合は onError で呼び出し元に伝える
+// （以前は無言で握りつぶしており、「作成中」表示のまま資料が届かないように見えていた）。
 function postDocumentRequest(
   game: GameState,
   request: string,
-  onDoc: (doc: { title: string; body: string }) => void
+  onDoc: (doc: { title: string; body: string }) => void,
+  onError?: () => void
 ): void {
   fetch("/api/player/tool-execution", {
     method: "POST",
@@ -141,13 +145,16 @@ function postDocumentRequest(
       request,
     }),
   })
-    .then((res) => res.json())
-    .then((doc) => {
-      if (!doc?.body) return;
+    .then(async (res) => {
+      const doc = await res.json().catch(() => null);
+      if (!res.ok || !doc?.body) {
+        onError?.();
+        return;
+      }
       onDoc({ title: doc.title || workMemoFallback(), body: doc.body });
     })
     .catch(() => {
-      /* 取得失敗時は何もしない */
+      onError?.();
     });
 }
 
@@ -185,10 +192,10 @@ function useGameProvider(): GameContextValue {
   );
 
   const requestDocument = useCallback(
-    (request: string) => {
+    (request: string, onError?: () => void) => {
       const currentGame = gameRef.current;
       if (!currentGame) return;
-      postDocumentRequest(currentGame, request, addGeneratedDoc);
+      postDocumentRequest(currentGame, request, addGeneratedDoc, onError);
     },
     [addGeneratedDoc]
   );

@@ -322,7 +322,7 @@ function useCallSession(ctrl: CallController, deps: CallSessionDeps) {
 // tool-call handler invokes the latest requestDoc through ctrl.requestDoc.
 function useDocToast(
   ctrl: CallController,
-  requestDocument: (req: string) => void,
+  requestDocument: (req: string, onError?: () => void) => void,
   t: Translate
 ): string | null {
   const [toast, setToast] = useState<string | null>(null);
@@ -340,7 +340,7 @@ function useDocToast(
 
   const requestDoc = useCallback(
     (req: string) => {
-      requestDocument(req);
+      requestDocument(req, () => showToast(t("docFailedToast")));
       showToast(t("docCreatingToast"));
     },
     [requestDocument, showToast, t]

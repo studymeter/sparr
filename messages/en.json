@@ -206,6 +206,7 @@
       "defaultDocRequest": "Investigate request and create document",
       "docStarted": "Started creating the document. This may take a moment.",
       "docCreatingToast": "Creating document. It will appear in the case folder shortly.",
+      "docFailedToast": "Document creation failed. Please try requesting it again.",
       "connecting": "Connecting…",
       "live": "On call",
       "connectionFailed": "Could not connect",
