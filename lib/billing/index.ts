@@ -81,13 +81,36 @@ export async function ensureStripeCustomerId(
   accountEmail: string,
   currentCustomerId: string | null
 ): Promise<string> {
-  if (currentCustomerId) return currentCustomerId;
-  const customer = await stripeClient().customers.create({
+  const client = stripeClient();
+
+  if (currentCustomerId) {
+    try {
+      const customer = await client.customers.retrieve(currentCustomerId);
+      if (!("deleted" in customer) || customer.deleted !== true) {
+        return currentCustomerId;
+      }
+    } catch (err) {
+      if (!isMissingCustomerError(err)) {
+        throw err;
+      }
+    }
+  }
+
+  const customer = await client.customers.create({
     email: accountEmail,
     metadata: { accountId },
   });
   await store.accounts.update(accountId, { stripeCustomerId: customer.id });
   return customer.id;
+}
+
+function isMissingCustomerError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const maybeError = err as { code?: unknown; type?: unknown };
+  return (
+    maybeError.type === "StripeInvalidRequestError" &&
+    maybeError.code === "resource_missing"
+  );
 }
 
 function parseTicketCount(raw: string | undefined): number | null {
