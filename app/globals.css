@@ -4033,6 +4033,7 @@ body {
   border-radius: var(--sm-radius-lg);
   background: var(--sm-bg-1);
   box-shadow: var(--sm-shadow-sm);
+  cursor: pointer;
   transition:
     transform var(--sm-dur-base, 200ms) var(--sm-ease-out),
     box-shadow var(--sm-dur-base, 200ms) var(--sm-ease-out);
