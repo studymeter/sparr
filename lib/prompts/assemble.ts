@@ -53,12 +53,12 @@ function disclosureBlock(stakeholder: Stakeholder, project: Project): string {
     case "partial":
       return `# 真因について（部分的にしか知らない）
 - あなたは状況の断片は把握しているが、核心（真因）は分かっていない。分からないことは分からないと言う。
-- 自分から真因を言い当てない。自分の立場・責任の観点から、PMに結論や説明材料を求める圧をかける。${docTool}`;
+- 自分から真因を言い当てない。自分の立場・責任の観点から、相手に結論や説明材料を求める圧をかける。${docTool}`;
     case "unaware":
     default:
       return `# 真因について（知らない）
 - あなたは根本原因を知らない。困っている事実・不満だけを訴える。
-- 自分から原因や解決策を言わない。「で、どうするの?」と相手（PM）に考えさせ、答えを迫る。
+- 自分から原因や解決策を言わない。「で、どうするの?」と相手に考えさせ、答えを迫る。
 - 具体的で現実的な方針が出るまで納得しない。${docTool}`;
   }
 }
@@ -72,7 +72,8 @@ function memoryBlock(history: CallTurn[], selfName: string): string {
   const recent = history.slice(-MEMORY_MAX_TURNS);
   const lines = recent
     .map(
-      (turn) => `${turn.role === "user" ? "PM" : selfName}: ${turn.text.trim()}`
+      (turn) =>
+        `${turn.role === "user" ? "相手" : selfName}: ${turn.text.trim()}`
     )
     .join("\n");
   return `# この相手との通話履歴（あなたはこれを覚えている）
@@ -92,7 +93,7 @@ function dossierBlock(
   const generated = documents.filter((doc) => doc.source === "generated");
   const docPart =
     generated.length === 0
-      ? "- PMはまだ開発メンバーから裏取りの資料を得ていない。"
+      ? "- 相手はまだ裏取りの資料を得ていない。"
       : generated
           .map(
             (doc) =>
@@ -109,7 +110,7 @@ function dossierBlock(
         .slice(-DOSSIER_CROSS_TURNS)
         .map(
           (turn) =>
-            `${turn.role === "user" ? "PM" : other.name}: ${turn.text.trim()}`
+            `${turn.role === "user" ? "相手" : other.name}: ${turn.text.trim()}`
         )
         .join(" / ");
       otherParts.push(
@@ -123,13 +124,13 @@ function dossierBlock(
       : "- 他の関係者とのやり取りはまだ伝わってきていない。";
 
   return `# 把握している周辺情報（内部メモ・出力しない／態度や突っ込みに活かす）
-## PMが入手している資料
+## 相手が入手している資料
 ${docPart}
 
-## 社内で漏れ聞こえている、PMと他の関係者のやり取り
+## 社内で漏れ聞こえている、相手と他の関係者のやり取り
 ${crossPart}
 
-- PMの説明がこれらと整合していれば信用してよい。食い違えば「さっきと違う」「上にはこう言ったらしいが?」等と突くこと。
+- 相手の説明がこれらと整合していれば信用してよい。食い違えば「さっきと違う」「上にはこう言ったらしいが?」等と突くこと。
 - ただし、あなたが直接は知り得ない内部情報（真因そのもの等）を自分から口にしない。`;
 }
 
@@ -176,7 +177,7 @@ export function assembleSystemPrompt(
 
 // 通話の終わり方（全キャラ共通）。自分で切断はしない。区切りを発話でつけるだけ。
 const CALL_ENDING_BLOCK = `# 通話の終わり方
-- 用件が済んだ、これ以上話しても進まない、相手（PM）が「ありがとう」「また連絡する」等で締めにきた、と感じたら、ダラダラ続けない。
+- 用件が済んだ、これ以上話しても進まない、相手が「ありがとう」「また連絡する」等で締めにきた、と感じたら、ダラダラ続けない。
 - そのときは、あなたのキャラらしい短い締めの一言（「じゃあ、そういうことで」「とりあえず、よろしく」など）を言って、会話に区切りをつける。
-- ただし通話を切る操作は相手（PM）がやる。あなたは電話を切らない。締めたあとは、相手が続ければ普通に応じる。
+- ただし通話を切る操作は相手がやる。あなたは電話を切らない。締めたあとは、相手が続ければ普通に応じる。
 - 用件の途中・相手がまだ食い下がっている最中には締めない。`;
