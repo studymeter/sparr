@@ -39,6 +39,12 @@ type GameContextValue = {
   // 資料作成依頼。コールを切っても完成する（生成はアプリ常駐のストア側で進む）。
   // onError は生成に失敗した場合に呼ばれる（呼び出し元でのトースト表示などに使う）。
   requestDocument: (request: string, onError?: () => void) => void;
+  // プレイ時間の起点。Hub コンポーネントは通話の開始・終了ごとに再マウントされる
+  // ため、ここ（ゲームのライフサイクルに紐づく側）で持つことでカウントが途切れない。
+  playStartedAt: number | null;
+  markPlayStarted: () => void;
+  hasShownPlayTimeReminder: boolean;
+  markPlayTimeReminderShown: () => void;
   reset: () => void;
 };
 
@@ -158,6 +164,37 @@ function postDocumentRequest(
     });
 }
 
+// プレイ時間の起点と「終了リマインダー案内済みか」。ゲームの生成／リセットに
+// 合わせて巻き戻す（Hub 側の再マウントには影響されない）。
+function usePlayTimeState() {
+  const [playStartedAt, setPlayStartedAt] = useState<number | null>(null);
+  const [hasShownPlayTimeReminder, setHasShownPlayTimeReminder] =
+    useState(false);
+
+  // Hub 初回表示時に一度だけ呼ばれる想定。以後の再マウント（通話の開始・終了）では
+  // 既に値があるので上書きされない。
+  const markPlayStarted = useCallback(() => {
+    setPlayStartedAt((prev) => prev ?? Date.now());
+  }, []);
+
+  const markPlayTimeReminderShown = useCallback(() => {
+    setHasShownPlayTimeReminder(true);
+  }, []);
+
+  const resetPlayTime = useCallback(() => {
+    setPlayStartedAt(null);
+    setHasShownPlayTimeReminder(false);
+  }, []);
+
+  return {
+    playStartedAt,
+    markPlayStarted,
+    hasShownPlayTimeReminder,
+    markPlayTimeReminderShown,
+    resetPlayTime,
+  };
+}
+
 function useGameProvider(): GameContextValue {
   const [game, setGame] = useState<GameState | null>(null);
   const gameRef = useRef<GameState | null>(null);
@@ -165,14 +202,26 @@ function useGameProvider(): GameContextValue {
     gameRef.current = game;
   });
 
-  const setupFromResponse = useCallback((res: SetupResponse) => {
-    const documents = buildDocuments(res);
-    setGame({
-      project: buildProject(res, documents),
-      stakeholders: buildStakeholders(res),
-      callLogs: {},
-    });
-  }, []);
+  const {
+    playStartedAt,
+    markPlayStarted,
+    hasShownPlayTimeReminder,
+    markPlayTimeReminderShown,
+    resetPlayTime,
+  } = usePlayTimeState();
+
+  const setupFromResponse = useCallback(
+    (res: SetupResponse) => {
+      const documents = buildDocuments(res);
+      setGame({
+        project: buildProject(res, documents),
+        stakeholders: buildStakeholders(res),
+        callLogs: {},
+      });
+      resetPlayTime();
+    },
+    [resetPlayTime]
+  );
 
   const addGeneratedDoc = useCallback(
     (doc: { title: string; body: string }): Doc => {
@@ -200,7 +249,10 @@ function useGameProvider(): GameContextValue {
     [addGeneratedDoc]
   );
 
-  const reset = useCallback(() => setGame(null), []);
+  const reset = useCallback(() => {
+    setGame(null);
+    resetPlayTime();
+  }, [resetPlayTime]);
 
   return useMemo<GameContextValue>(
     () => ({
@@ -209,6 +261,10 @@ function useGameProvider(): GameContextValue {
       addGeneratedDoc,
       appendCallLog,
       requestDocument,
+      playStartedAt,
+      markPlayStarted,
+      hasShownPlayTimeReminder,
+      markPlayTimeReminderShown,
       reset,
     }),
     [
@@ -217,6 +273,10 @@ function useGameProvider(): GameContextValue {
       addGeneratedDoc,
       appendCallLog,
       requestDocument,
+      playStartedAt,
+      markPlayStarted,
+      hasShownPlayTimeReminder,
+      markPlayTimeReminderShown,
       reset,
     ]
   );

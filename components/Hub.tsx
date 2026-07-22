@@ -5,30 +5,41 @@ import { useTranslations } from "next-intl";
 import DocumentViewer from "@/components/DocumentViewer";
 import CornerDeco from "@/components/CornerDeco";
 import BrandLogo from "@/components/BrandLogo";
+import { useGame } from "@/app/store";
 import { PLAY_TIME_REMINDER_MS } from "@/lib/constants";
 import type { GameState, Stakeholder } from "@/lib/types";
 
 const PLAY_TIME_TICK_MS = 1000;
 
 // プレイ時間の経過を計測し、規定時間を超えたら一度だけ終了リマインダーを出す。
+// 開始時刻と「案内済みか」はゲーム状態側（app/store.tsx）で持つ — Hub は通話の
+// 開始・終了ごとに再マウントされるため、Hub のローカル state だとカウントが
+// 途切れてしまう。
 function usePlayTimer() {
-  const startRef = useRef<number | null>(null);
-  const remindedRef = useRef(false);
+  const { playStartedAt, markPlayStarted, hasShownPlayTimeReminder } =
+    useGame();
+  const { markPlayTimeReminderShown } = useGame();
   const [elapsedMs, setElapsedMs] = useState(0);
   const [showReminder, setShowReminder] = useState(false);
 
   useEffect(() => {
-    startRef.current = Date.now();
-    const id = setInterval(() => {
-      const elapsed = Date.now() - (startRef.current ?? Date.now());
+    markPlayStarted();
+  }, [markPlayStarted]);
+
+  useEffect(() => {
+    if (playStartedAt === null) return;
+    const tick = () => {
+      const elapsed = Date.now() - playStartedAt;
       setElapsedMs(elapsed);
-      if (!remindedRef.current && elapsed >= PLAY_TIME_REMINDER_MS) {
-        remindedRef.current = true;
+      if (!hasShownPlayTimeReminder && elapsed >= PLAY_TIME_REMINDER_MS) {
+        markPlayTimeReminderShown();
         setShowReminder(true);
       }
-    }, PLAY_TIME_TICK_MS);
+    };
+    tick();
+    const id = setInterval(tick, PLAY_TIME_TICK_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [playStartedAt, hasShownPlayTimeReminder, markPlayTimeReminderShown]);
 
   return {
     elapsedMs,
