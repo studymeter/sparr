@@ -2408,27 +2408,6 @@ button {
   text-align: center;
 }
 
-/* ハブカード：チップ廃止・行動ガイドの説明 */
-.pc-guide {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 800;
-  padding: 9px 16px;
-  border-radius: 12px;
-  border: 2px solid #15171c;
-  box-shadow: 2px 2px 0 #15171c;
-  background: #fff;
-}
-.pc-guide.guide-user_dept {
-  color: var(--pink);
-}
-.pc-guide.guide-manager {
-  color: var(--accent);
-}
-.pc-guide.guide-dev_member {
-  color: #b45309;
-}
-
 /* ---------- 結果（採点＋ネタバレ）：ブリーフィング踏襲 ---------- */
 .label-green {
   background: var(--ok);
@@ -2902,10 +2881,6 @@ button {
     height: 56px;
     font-size: 24px;
     margin-bottom: 10px;
-  }
-  .pc-guide {
-    font-size: 11px;
-    padding: 4px 10px;
   }
   .pc-doc-badge {
     margin-top: 4px;
@@ -4313,14 +4288,6 @@ body {
   background: #6633cc;
   color: #ffffff;
 }
-.pc-guide {
-  border: 1px solid #bfdbfe;
-  box-shadow: none;
-  border-radius: var(--sm-radius-pill);
-  background: #e5f0fe;
-  color: #444444;
-  font-weight: 700;
-}
 .pc-doc-badge {
   display: inline-flex;
   align-items: center;
@@ -4849,4 +4816,32 @@ body {
 .brief-label.label-purple {
   background: none;
   color: #6633cc;
+}
+
+/* プレイ時間表示（ハブ左下・固定） */
+.hub-play-time {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(21, 23, 28, 0.85);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  box-shadow: var(--shadow-sm);
+  z-index: 20;
+}
+
+@media (max-width: 640px) {
+  .hub-play-time {
+    left: 12px;
+    bottom: 12px;
+    font-size: 12px;
+    padding: 6px 12px;
+  }
 }

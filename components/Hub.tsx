@@ -5,7 +5,44 @@ import { useTranslations } from "next-intl";
 import DocumentViewer from "@/components/DocumentViewer";
 import CornerDeco from "@/components/CornerDeco";
 import BrandLogo from "@/components/BrandLogo";
+import { PLAY_TIME_REMINDER_MS } from "@/lib/constants";
 import type { GameState, Stakeholder } from "@/lib/types";
+
+const PLAY_TIME_TICK_MS = 1000;
+
+// プレイ時間の経過を計測し、規定時間を超えたら一度だけ終了リマインダーを出す。
+function usePlayTimer() {
+  const startRef = useRef<number | null>(null);
+  const remindedRef = useRef(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [showReminder, setShowReminder] = useState(false);
+
+  useEffect(() => {
+    startRef.current = Date.now();
+    const id = setInterval(() => {
+      const elapsed = Date.now() - (startRef.current ?? Date.now());
+      setElapsedMs(elapsed);
+      if (!remindedRef.current && elapsed >= PLAY_TIME_REMINDER_MS) {
+        remindedRef.current = true;
+        setShowReminder(true);
+      }
+    }, PLAY_TIME_TICK_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  return {
+    elapsedMs,
+    showReminder,
+    dismissReminder: () => setShowReminder(false),
+  };
+}
+
+function formatElapsed(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
 
 // Guards against accidental back-navigation: intercepts popstate and asks
 // the user to confirm before actually leaving the page.
@@ -149,6 +186,62 @@ function FlagIcon() {
   );
 }
 
+function ClockIcon() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+      <path
+        d="M12 7v5l3 3"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PlayTimeBadge({ elapsedMs }: { elapsedMs: number }) {
+  return (
+    <div className="hub-play-time">
+      <ClockIcon />
+      <span>{formatElapsed(elapsedMs)}</span>
+    </div>
+  );
+}
+
+function PlayTimeReminderModal({
+  onEnd,
+  onContinue,
+}: {
+  onEnd: () => void;
+  onContinue: () => void;
+}) {
+  const t = useTranslations("game.hub");
+  return (
+    <div className="modal-backdrop">
+      <div className="modal giveup">
+        <h2>{t("playTimeReminderTitle")}</h2>
+        <p className="giveup-warn">{t("playTimeReminderBody")}</p>
+        <div className="giveup-actions">
+          <button className="btn-tertiary" onClick={onContinue}>
+            {t("playTimeReminderContinue")}
+          </button>
+          <button className="btn-primary" onClick={onEnd}>
+            {t("playTimeReminderEnd")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HubHeader() {
   return (
     <header className="mp-header briefing-header">
@@ -174,15 +267,14 @@ function PersonaCard({
       <div className={`pc-avatar pc-color-${index % 3}`}>
         {contact.name.trim().slice(0, 1)}
       </div>
-      <span className="pc-guide">{contact.role}</span>
-      <div className="pc-name">{contact.name}</div>
-      <div className="pc-company">{contact.company}</div>
       {contact.docToolEnabled && (
         <span className="pc-doc-badge">
           <DocBadgeIcon />
           {t("docBadge")}
         </span>
       )}
+      <div className="pc-name">{contact.name}</div>
+      <div className="pc-company">{contact.company}</div>
       <button
         type="button"
         className="btn-primary"
@@ -243,6 +335,51 @@ function LeaveConfirmModal({
   );
 }
 
+function HubOverlays({
+  showDocs,
+  documents,
+  starredDocs,
+  onToggleStarredDoc,
+  onCloseDocs,
+  showLeaveConfirm,
+  onStay,
+  onLeave,
+  showReminder,
+  onEnd,
+  onContinue,
+}: {
+  showDocs: boolean;
+  documents: GameState["project"]["documents"];
+  starredDocs: Set<string>;
+  onToggleStarredDoc: (id: string) => void;
+  onCloseDocs: () => void;
+  showLeaveConfirm: boolean;
+  onStay: () => void;
+  onLeave: () => void;
+  showReminder: boolean;
+  onEnd: () => void;
+  onContinue: () => void;
+}) {
+  return (
+    <>
+      {showDocs && (
+        <DocumentViewer
+          documents={documents}
+          onClose={onCloseDocs}
+          starred={starredDocs}
+          onToggleStar={onToggleStarredDoc}
+        />
+      )}
+      {showLeaveConfirm && (
+        <LeaveConfirmModal onStay={onStay} onLeave={onLeave} />
+      )}
+      {showReminder && (
+        <PlayTimeReminderModal onEnd={onEnd} onContinue={onContinue} />
+      )}
+    </>
+  );
+}
+
 export default function Hub({
   game,
   onCall,
@@ -259,12 +396,13 @@ export default function Hub({
   const t = useTranslations("game.hub");
   const [showDocs, setShowDocs] = useState(false);
   const { showLeaveConfirm, stayOnPage, leavePage } = useLeaveGuard();
+  const { elapsedMs, showReminder, dismissReminder } = usePlayTimer();
 
   return (
     <div className="home">
       <CornerDeco />
       <HubHeader />
-
+      <PlayTimeBadge elapsedMs={elapsedMs} />
       <main className="home-main">
         <div className="home-content">
           <h2 className="home-h">{game.project.title}</h2>
@@ -291,18 +429,19 @@ export default function Hub({
         </div>
       </main>
 
-      {showDocs && (
-        <DocumentViewer
-          documents={game.project.documents}
-          onClose={() => setShowDocs(false)}
-          starred={starredDocs}
-          onToggleStar={onToggleStarredDoc}
-        />
-      )}
-
-      {showLeaveConfirm && (
-        <LeaveConfirmModal onStay={stayOnPage} onLeave={leavePage} />
-      )}
+      <HubOverlays
+        showDocs={showDocs}
+        documents={game.project.documents}
+        starredDocs={starredDocs}
+        onToggleStarredDoc={onToggleStarredDoc}
+        onCloseDocs={() => setShowDocs(false)}
+        showLeaveConfirm={showLeaveConfirm}
+        onStay={stayOnPage}
+        onLeave={leavePage}
+        showReminder={showReminder}
+        onEnd={onGiveUp}
+        onContinue={dismissReminder}
+      />
     </div>
   );
 }

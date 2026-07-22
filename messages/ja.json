@@ -193,7 +193,11 @@
       "leaveConfirmTitle": "本当によろしいですか？",
       "leaveConfirmBody": "このページを離れると、進行中のプレイ内容（会話の記録や作成した資料）はすべて失われます。",
       "stay": "とどまる",
-      "leave": "離れる"
+      "leave": "離れる",
+      "playTimeReminderTitle": "調子はどうですか？",
+      "playTimeReminderBody": "ロールプレイをはじめて15分が経過しました。きりの良いところで、プレイを終了して、結果を確認してみましょう。",
+      "playTimeReminderEnd": "終了する",
+      "playTimeReminderContinue": "続ける"
     },
     "call": {
       "sessionFailed": "セッション発行に失敗しました",
