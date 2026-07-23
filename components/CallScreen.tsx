@@ -322,7 +322,12 @@ function useCallSession(ctrl: CallController, deps: CallSessionDeps) {
 // tool-call handler invokes the latest requestDoc through ctrl.requestDoc.
 function useDocToast(
   ctrl: CallController,
-  requestDocument: (req: string) => void,
+  requestDocument: (
+    req: string,
+    stakeholderId: string,
+    onError?: () => void
+  ) => void,
+  stakeholderId: string,
   t: Translate
 ): string | null {
   const [toast, setToast] = useState<string | null>(null);
@@ -340,10 +345,10 @@ function useDocToast(
 
   const requestDoc = useCallback(
     (req: string) => {
-      requestDocument(req);
+      requestDocument(req, stakeholderId, () => showToast(t("docFailedToast")));
       showToast(t("docCreatingToast"));
     },
-    [requestDocument, showToast, t]
+    [requestDocument, stakeholderId, showToast, t]
   );
 
   useEffect(() => {
@@ -387,7 +392,7 @@ function useVoiceCall({
     setErrMsg,
   });
 
-  const toast = useDocToast(ctrl, requestDocument, t);
+  const toast = useDocToast(ctrl, requestDocument, stakeholder.id, t);
 
   const toggleMute = useCallback(() => {
     const next = !muted;

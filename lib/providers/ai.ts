@@ -43,6 +43,10 @@ export type SetupInput = {
 export type DocumentGenerationInput = {
   project: Project;
   stakeholders: Stakeholder[];
+  // Which stakeholder's call invoked the document tool — the adapter must
+  // generate as this specific persona, not guess from role text (role is a
+  // free-form label rolled per play, not a stable identifier).
+  stakeholderId: string;
   request: string;
 };
 

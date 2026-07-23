@@ -365,16 +365,18 @@ function SearchIcon() {
 function ScenarioList({
   scenarios,
   onSelect,
+  onOpenDetail,
 }: {
   scenarios: ScenarioCard[];
   onSelect: (scenario: ScenarioCard) => void;
+  onOpenDetail: (scenario: ScenarioCard) => void;
 }) {
   const t = useTranslations("mypage");
   const tc = useTranslations("common");
   return (
     <div className="mp-scenarios">
       {scenarios.map((sc) => (
-        <div className="mp-card" key={sc.id}>
+        <div className="mp-card" key={sc.id} onClick={() => onOpenDetail(sc)}>
           <span className="mp-card-title">{sc.title || t("noTitle")}</span>
           <span className="mp-card-desc">
             {truncate(sc.description || t("noDescription"), 75)}
@@ -390,13 +392,52 @@ function ScenarioList({
             <button
               type="button"
               className="btn-primary"
-              onClick={() => onSelect(sc)}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                onSelect(sc);
+              }}
             >
               {tc("start")} →
             </button>
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function ScenarioDetailModal({
+  scenario,
+  onClose,
+  onStart,
+}: {
+  scenario: ScenarioCard;
+  onClose: () => void;
+  onStart: () => void;
+}) {
+  const t = useTranslations("mypage");
+  const tc = useTranslations("common");
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal mp-detail-modal"
+        onClick={(ev) => ev.stopPropagation()}
+      >
+        <div className="mp-confirm-body">
+          <h3 className="mp-confirm-title">{scenario.title || t("noTitle")}</h3>
+          <p className="mp-confirm-text mp-detail-text">
+            {scenario.description || t("noDescription")}
+          </p>
+          <div className="mp-confirm-actions">
+            <button type="button" className="btn-tertiary" onClick={onClose}>
+              {tc("close")}
+            </button>
+            <button type="button" className="btn-primary" onClick={onStart}>
+              {tc("start")} →
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -413,6 +454,9 @@ function ScenarioSection({
   onSelect: (scenario: ScenarioCard) => void;
 }) {
   const t = useTranslations("mypage");
+  const [detailScenario, setDetailScenario] = useState<ScenarioCard | null>(
+    null
+  );
   const filteredScenarios = scenarios.filter((sc) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -439,7 +483,21 @@ function ScenarioSection({
           {scenarios.length === 0 ? t("noScenarios") : t("noMatchingScenarios")}
         </p>
       ) : (
-        <ScenarioList scenarios={filteredScenarios} onSelect={onSelect} />
+        <ScenarioList
+          scenarios={filteredScenarios}
+          onSelect={onSelect}
+          onOpenDetail={setDetailScenario}
+        />
+      )}
+      {detailScenario && (
+        <ScenarioDetailModal
+          scenario={detailScenario}
+          onClose={() => setDetailScenario(null)}
+          onStart={() => {
+            onSelect(detailScenario);
+            setDetailScenario(null);
+          }}
+        />
       )}
     </section>
   );

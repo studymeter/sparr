@@ -193,7 +193,11 @@
       "leaveConfirmTitle": "Are you sure?",
       "leaveConfirmBody": "If you leave this page, all in-progress play (conversation logs and created documents) will be lost.",
       "stay": "Stay",
-      "leave": "Leave"
+      "leave": "Leave",
+      "playTimeReminderTitle": "How's it going?",
+      "playTimeReminderBody": "15 minutes have passed since you started the roleplay. At a good stopping point, consider finishing and checking your results.",
+      "playTimeReminderEnd": "Finish",
+      "playTimeReminderContinue": "Keep going"
     },
     "call": {
       "sessionFailed": "Failed to issue session",
@@ -202,6 +206,7 @@
       "defaultDocRequest": "Investigate request and create document",
       "docStarted": "Started creating the document. This may take a moment.",
       "docCreatingToast": "Creating document. It will appear in the case folder shortly.",
+      "docFailedToast": "Document creation failed. Please try requesting it again.",
       "connecting": "Connecting…",
       "live": "On call",
       "connectionFailed": "Could not connect",

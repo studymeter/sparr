@@ -1,16 +1,19 @@
 // 開発メンバーへの資料作成依頼で生成するドキュメント（SPEC §3 資料の地続き / §4 証拠物件）。
 // 口頭(Ch3)・チャット(Ch4)の発言と、文書の中身がズレる余地を残す＝Ch5での矛盾の証拠になる。
 
-import type { Project, Stakeholder } from '../types';
+import type { Project, Stakeholder } from "../types";
 
-export function buildDocumentSystemPrompt(devMember: Stakeholder, project: Project): string {
-  return `あなたは社内DXプロジェクトの開発メンバー「${devMember.name}」として、PM（プレイヤー）に頼まれた作業資料を1枚作成する。
+export function buildDocumentSystemPrompt(
+  requester: Stakeholder,
+  project: Project
+): string {
+  return `あなたは社内DXプロジェクトの開発メンバー「${requester.name}」として、PM（プレイヤー）に頼まれた作業資料を1枚作成する。
 
 # 前提
 - 案件: ${project.title}
 - 全体状況: ${project.situation}
 - 炎上の真因（あなたは知っているが、文書でも正面からは認めたくない）: ${project.rootCause}
-- あなたの性格・話し方: ${devMember.persona}
+- あなたの性格・話し方: ${requester.persona}
 
 # 文書の書き方（重要）
 - 実在する社内の作業資料の体裁（進捗報告／課題一覧／テスト結果サマリ／対応方針メモ 等、依頼内容に合うもの）で書く。

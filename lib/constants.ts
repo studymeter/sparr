@@ -33,3 +33,6 @@ export const SCORE_C_MIN = 30;
 
 // tickets: 登録時の初回付与枚数（生涯・定期付与なし）
 export const TICKET_INITIAL_GRANT_COUNT = 3;
+
+// Hub.tsx: この時間が経つと「そろそろ終了？」のリマインダーを出す (ms)
+export const PLAY_TIME_REMINDER_MS = 15 * 60 * 1000;

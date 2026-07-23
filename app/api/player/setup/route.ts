@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { providers } from "@/lib/composition";
 import { requireAuthenticated } from "@/lib/api/principal";
-import { consumeTicket, InsufficientTicketsError } from "@/lib/tickets";
+import { getTicketSnapshot } from "@/lib/tickets";
 import type { Store } from "@/lib/providers";
 
 export const runtime = "nodejs";
@@ -12,25 +12,21 @@ type Body = {
   seed?: string;
 };
 
-// Consume a play ticket for the player. Returns a 402 response when the
-// player has no tickets left, or null when consumption succeeded.
-async function consumePlayerTicket(
+// Ticket consumption now happens on successful evaluation (see
+// app/api/player/evaluation/route.ts), not at setup. Setup only gates on
+// having a ticket available, without consuming it yet.
+async function requirePlayerTicket(
   store: Store,
-  playerId: string,
-  scenarioId: string
+  playerId: string
 ): Promise<NextResponse | null> {
-  try {
-    await consumeTicket(store, playerId, scenarioId);
-    return null;
-  } catch (err) {
-    if (err instanceof InsufficientTicketsError) {
-      return NextResponse.json(
-        { error: "insufficient_tickets" },
-        { status: 402 }
-      );
-    }
-    throw err;
+  const { balance } = await getTicketSnapshot(store, playerId);
+  if (balance < 1) {
+    return NextResponse.json(
+      { error: "insufficient_tickets" },
+      { status: 402 }
+    );
   }
+  return null;
 }
 
 export async function POST(req: Request) {
@@ -49,11 +45,7 @@ export async function POST(req: Request) {
     const authError = requireAuthenticated(principal);
     if (authError) return authError;
     if (principal.role === "player") {
-      const ticketError = await consumePlayerTicket(
-        store,
-        principal.id,
-        body.scenarioId
-      );
+      const ticketError = await requirePlayerTicket(store, principal.id);
       if (ticketError) return ticketError;
     }
     const scenario = await store.scenarios.get(body.scenarioId);

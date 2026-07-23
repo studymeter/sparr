@@ -193,7 +193,11 @@
       "leaveConfirmTitle": "本当によろしいですか？",
       "leaveConfirmBody": "このページを離れると、進行中のプレイ内容（会話の記録や作成した資料）はすべて失われます。",
       "stay": "とどまる",
-      "leave": "離れる"
+      "leave": "離れる",
+      "playTimeReminderTitle": "調子はどうですか？",
+      "playTimeReminderBody": "ロールプレイをはじめて15分が経過しました。きりの良いところで、プレイを終了して、結果を確認してみましょう。",
+      "playTimeReminderEnd": "終了する",
+      "playTimeReminderContinue": "続ける"
     },
     "call": {
       "sessionFailed": "セッション発行に失敗しました",
@@ -202,6 +206,7 @@
       "defaultDocRequest": "依頼内容の調査・資料化",
       "docStarted": "資料の作成に着手しました。少し時間がかかります。",
       "docCreatingToast": "資料を作成しています。まもなく案件フォルダに届きます。",
+      "docFailedToast": "資料の作成に失敗しました。もう一度依頼してみてください。",
       "connecting": "接続中…",
       "live": "通話中",
       "connectionFailed": "接続できませんでした",
