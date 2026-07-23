@@ -420,12 +420,12 @@ function ScenarioDetailModal({
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        className="modal mp-confirm-modal"
+        className="modal mp-detail-modal"
         onClick={(ev) => ev.stopPropagation()}
       >
         <div className="mp-confirm-body">
           <h3 className="mp-confirm-title">{scenario.title || t("noTitle")}</h3>
-          <p className="mp-confirm-text">
+          <p className="mp-confirm-text mp-detail-text">
             {scenario.description || t("noDescription")}
           </p>
           <div className="mp-confirm-actions">

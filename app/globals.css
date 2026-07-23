@@ -4073,6 +4073,17 @@ body {
   flex: 1;
 }
 
+/* シナリオ詳細モーダル：説明文が長くなる想定なので画面を大きく使う */
+.mp-detail-modal {
+  width: min(880px, 92vw);
+  max-height: 82vh;
+}
+
+.mp-detail-text {
+  font-size: 15px;
+  white-space: pre-wrap;
+}
+
 /* 音声アニメーション */
 @keyframes voice-bar {
   0%,
