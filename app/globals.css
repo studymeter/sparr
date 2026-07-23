@@ -1608,6 +1608,7 @@ button {
   font-size: 13px;
   color: var(--muted);
   margin-bottom: 10px;
+  padding-bottom: 8px;
   margin-bottom: auto;
   line-height: 1.5;
 }
