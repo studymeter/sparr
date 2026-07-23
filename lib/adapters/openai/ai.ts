@@ -77,18 +77,22 @@ export class OpenAIAIProvider implements AIProvider {
   async generateDocument(
     input: DocumentGenerationInput
   ): Promise<DocumentGenerationResult> {
-    const { project, stakeholders, request } = input;
-    const devMember = stakeholders.find(
-      (stakeholder) => stakeholder.role === "dev_member"
+    const { project, stakeholders, stakeholderId, request } = input;
+    // `role` is a free-form label the setup prompt rolls per play (e.g. a
+    // Japanese job title), not a stable key — matching on it (as this used
+    // to do, looking for the literal string "dev_member") almost never
+    // found the caller. The stakeholder who invoked the tool is known by id.
+    const requester = stakeholders.find(
+      (stakeholder) => stakeholder.id === stakeholderId
     );
-    if (!devMember) {
-      throw new Error("開発メンバーが見つかりません");
+    if (!requester) {
+      throw new Error("資料生成を依頼したキャラクターが見つかりません");
     }
     const completion = await this.complete({
       messages: [
         {
           role: "system",
-          content: buildDocumentSystemPrompt(devMember, project),
+          content: buildDocumentSystemPrompt(requester, project),
         },
         {
           role: "user",

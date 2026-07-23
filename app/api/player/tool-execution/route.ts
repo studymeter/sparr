@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 type Body = {
   project: Project;
   stakeholders: Stakeholder[];
+  stakeholderId: string;
   request: string;
 };
 
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
     if (authError) return authError;
 
     const body = (await req.json()) as Body;
-    if (!body.project || !body.stakeholders?.length) {
+    if (!body.project || !body.stakeholders?.length || !body.stakeholderId) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
     const data = await providers.ai.generateDocument(body);

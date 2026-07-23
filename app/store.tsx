@@ -37,8 +37,13 @@ type GameContextValue = {
   addGeneratedDoc: (doc: { title: string; body: string }) => Doc;
   appendCallLog: (stakeholderId: string, turns: CallTurn[]) => void;
   // 資料作成依頼。コールを切っても完成する（生成はアプリ常駐のストア側で進む）。
+  // stakeholderId は依頼したキャラ（アダプターが「誰として書くか」を決めるのに使う）。
   // onError は生成に失敗した場合に呼ばれる（呼び出し元でのトースト表示などに使う）。
-  requestDocument: (request: string, onError?: () => void) => void;
+  requestDocument: (
+    request: string,
+    stakeholderId: string,
+    onError?: () => void
+  ) => void;
   // プレイ時間の起点。Hub コンポーネントは通話の開始・終了ごとに再マウントされる
   // ため、ここ（ゲームのライフサイクルに紐づく側）で持つことでカウントが途切れない。
   playStartedAt: number | null;
@@ -136,18 +141,21 @@ function withAppendedLog(
 // 依頼後にコールを切って画面を離れても資料は完成して届く（生成はストア側で非同期に進む）。
 // サーバがエラーを返した場合や本文が空だった場合は onError で呼び出し元に伝える
 // （以前は無言で握りつぶしており、「作成中」表示のまま資料が届かないように見えていた）。
-function postDocumentRequest(
-  game: GameState,
-  request: string,
-  onDoc: (doc: { title: string; body: string }) => void,
-  onError?: () => void
-): void {
+function postDocumentRequest(params: {
+  game: GameState;
+  stakeholderId: string;
+  request: string;
+  onDoc: (doc: { title: string; body: string }) => void;
+  onError?: () => void;
+}): void {
+  const { game, stakeholderId, request, onDoc, onError } = params;
   fetch("/api/player/tool-execution", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       project: game.project,
       stakeholders: game.stakeholders,
+      stakeholderId,
       request,
     }),
   })
@@ -241,10 +249,16 @@ function useGameProvider(): GameContextValue {
   );
 
   const requestDocument = useCallback(
-    (request: string, onError?: () => void) => {
+    (request: string, stakeholderId: string, onError?: () => void) => {
       const currentGame = gameRef.current;
       if (!currentGame) return;
-      postDocumentRequest(currentGame, request, addGeneratedDoc, onError);
+      postDocumentRequest({
+        game: currentGame,
+        stakeholderId,
+        request,
+        onDoc: addGeneratedDoc,
+        onError,
+      });
     },
     [addGeneratedDoc]
   );
