@@ -50,6 +50,10 @@ type GameContextValue = {
   markPlayStarted: () => void;
   hasShownPlayTimeReminder: boolean;
   markPlayTimeReminderShown: () => void;
+  // リマインダーの表示中かどうかも同じ理由でここに置く。「続ける」か「終了」を
+  // 押すまでは、通話の開始・終了を挟んでも消えない。
+  isPlayTimeReminderDismissed: boolean;
+  dismissPlayTimeReminder: () => void;
   reset: () => void;
 };
 
@@ -178,6 +182,8 @@ function usePlayTimeState() {
   const [playStartedAt, setPlayStartedAt] = useState<number | null>(null);
   const [hasShownPlayTimeReminder, setHasShownPlayTimeReminder] =
     useState(false);
+  const [isPlayTimeReminderDismissed, setIsPlayTimeReminderDismissed] =
+    useState(false);
 
   // Hub 初回表示時に一度だけ呼ばれる想定。以後の再マウント（通話の開始・終了）では
   // 既に値があるので上書きされない。
@@ -189,9 +195,14 @@ function usePlayTimeState() {
     setHasShownPlayTimeReminder(true);
   }, []);
 
+  const dismissPlayTimeReminder = useCallback(() => {
+    setIsPlayTimeReminderDismissed(true);
+  }, []);
+
   const resetPlayTime = useCallback(() => {
     setPlayStartedAt(null);
     setHasShownPlayTimeReminder(false);
+    setIsPlayTimeReminderDismissed(false);
   }, []);
 
   return {
@@ -199,6 +210,8 @@ function usePlayTimeState() {
     markPlayStarted,
     hasShownPlayTimeReminder,
     markPlayTimeReminderShown,
+    isPlayTimeReminderDismissed,
+    dismissPlayTimeReminder,
     resetPlayTime,
   };
 }
@@ -215,6 +228,8 @@ function useGameProvider(): GameContextValue {
     markPlayStarted,
     hasShownPlayTimeReminder,
     markPlayTimeReminderShown,
+    isPlayTimeReminderDismissed,
+    dismissPlayTimeReminder,
     resetPlayTime,
   } = usePlayTimeState();
 
@@ -279,6 +294,8 @@ function useGameProvider(): GameContextValue {
       markPlayStarted,
       hasShownPlayTimeReminder,
       markPlayTimeReminderShown,
+      isPlayTimeReminderDismissed,
+      dismissPlayTimeReminder,
       reset,
     }),
     [
@@ -291,6 +308,8 @@ function useGameProvider(): GameContextValue {
       markPlayStarted,
       hasShownPlayTimeReminder,
       markPlayTimeReminderShown,
+      isPlayTimeReminderDismissed,
+      dismissPlayTimeReminder,
       reset,
     ]
   );

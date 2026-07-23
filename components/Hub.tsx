@@ -12,15 +12,20 @@ import type { GameState, Stakeholder } from "@/lib/types";
 const PLAY_TIME_TICK_MS = 1000;
 
 // プレイ時間の経過を計測し、規定時間を超えたら一度だけ終了リマインダーを出す。
-// 開始時刻と「案内済みか」はゲーム状態側（app/store.tsx）で持つ — Hub は通話の
-// 開始・終了ごとに再マウントされるため、Hub のローカル state だとカウントが
-// 途切れてしまう。
+// 開始時刻・案内済みか・リマインダー表示中かはすべてゲーム状態側（app/store.tsx）
+// で持つ — Hub は通話の開始・終了ごとに再マウントされるため、Hub のローカル
+// state だとカウントもリマインダーの表示も途切れてしまう（「続ける」「終了」を
+// 押すまでは消えないようにする）。
 function usePlayTimer() {
-  const { playStartedAt, markPlayStarted, hasShownPlayTimeReminder } =
-    useGame();
-  const { markPlayTimeReminderShown } = useGame();
+  const {
+    playStartedAt,
+    markPlayStarted,
+    hasShownPlayTimeReminder,
+    markPlayTimeReminderShown,
+    isPlayTimeReminderDismissed,
+    dismissPlayTimeReminder,
+  } = useGame();
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [showReminder, setShowReminder] = useState(false);
 
   useEffect(() => {
     markPlayStarted();
@@ -33,7 +38,6 @@ function usePlayTimer() {
       setElapsedMs(elapsed);
       if (!hasShownPlayTimeReminder && elapsed >= PLAY_TIME_REMINDER_MS) {
         markPlayTimeReminderShown();
-        setShowReminder(true);
       }
     };
     tick();
@@ -43,8 +47,8 @@ function usePlayTimer() {
 
   return {
     elapsedMs,
-    showReminder,
-    dismissReminder: () => setShowReminder(false),
+    showReminder: hasShownPlayTimeReminder && !isPlayTimeReminderDismissed,
+    dismissReminder: dismissPlayTimeReminder,
   };
 }
 
@@ -450,7 +454,10 @@ export default function Hub({
         onStay={stayOnPage}
         onLeave={leavePage}
         showReminder={showReminder}
-        onEnd={onGiveUp}
+        onEnd={() => {
+          dismissReminder();
+          onGiveUp();
+        }}
         onContinue={dismissReminder}
       />
     </div>
