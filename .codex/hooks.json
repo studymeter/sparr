@@ -1,0 +1,65 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/guard-secrets.sh",
+            "timeout": 15,
+            "statusMessage": "Scanning for secret leakage..."
+          },
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/guard-protected.sh",
+            "timeout": 15,
+            "statusMessage": "Checking protected paths..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/guard-bash.sh",
+            "timeout": 15,
+            "statusMessage": "Checking command safety..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/format.sh",
+            "timeout": 60,
+            "statusMessage": "Formatting..."
+          },
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/sync-cursor.sh",
+            "timeout": 30,
+            "statusMessage": "Syncing .cursor..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .codex/hooks/verify.sh",
+            "timeout": 300,
+            "statusMessage": "Type-checking before finishing..."
+          }
+        ]
+      }
+    ]
+  }
+}

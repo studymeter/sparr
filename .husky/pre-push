@@ -1,5 +1,5 @@
-echo ">>> [pre-push] セキュリティチェック..."
-npm run security:check || { echo "ERROR: セキュリティチェック失敗。プッシュを中止します。"; exit 1; }
+echo ">>> [pre-push] CI parity preflight (mirrors .github/workflows/security.yml)..."
+npm run preflight || { echo "ERROR: preflight 失敗。CI が赤になる状態。プッシュを中止します。"; exit 1; }
 echo ">>> [pre-push] .env 保護確認..."
 git check-ignore .env.local > /dev/null 2>&1 || { echo "ERROR: .env.local が .gitignore されていません。"; exit 1; }
 echo ">>> [pre-push] OK"
