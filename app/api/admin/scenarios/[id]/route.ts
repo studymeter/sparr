@@ -7,6 +7,14 @@ import type { PersonaCreateInput, Scenario } from "@/lib/providers";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function normalizeTags(tags: unknown): string[] {
+  if (!Array.isArray(tags)) return [];
+  return tags
+    .filter((tag): tag is string => typeof tag === "string")
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0);
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -45,6 +53,7 @@ export async function POST(
     };
     const store = await providers.getStore();
     const scenario = await store.scenarios.update(id, {
+      tags: normalizeTags(body.tags),
       basePrompt: body.basePrompt,
       challengePrompt: body.challengePrompt,
       documentsPrompt: body.documentsPrompt,

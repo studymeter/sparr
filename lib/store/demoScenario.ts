@@ -8,6 +8,7 @@ export function buildDemoScenario(): Scenario {
     title: "炎上DX案件の火消し",
     description:
       "新任PMとして、UATで数字が合わない炎上案件に挑む。怒るユーザー部門・責任逃れの上司・他人事の開発メンバーから真因を引き出せ。",
+    tags: ["PM", "DX", "炎上対応"],
     basePrompt: `
 あなたは、事業会社の社内DX案件を舞台にしたロールプレイ訓練シナリオを運用する。
 舞台は必ず「UATで数字が合わない炎上案件」。プレイヤーは新任PMである。

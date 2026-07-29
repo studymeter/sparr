@@ -274,17 +274,30 @@ type ScenarioRow = {
   id: string;
   title: string;
   description: string;
+  tags: string;
   base_prompt: string;
   challenge_prompt: string;
   documents_prompt: string;
   rubric_prompt: string;
 };
 
+function parseTags(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((tag): tag is string => typeof tag === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 function toScenario(row: ScenarioRow): Scenario {
   return {
     id: row.id,
     title: row.title,
     description: row.description,
+    tags: parseTags(row.tags),
     basePrompt: row.base_prompt,
     challengePrompt: row.challenge_prompt,
     documentsPrompt: row.documents_prompt,
@@ -298,13 +311,14 @@ function insertScenario(
 ): Scenario {
   db.prepare(
     `
-      INSERT INTO scenario (id, title, description, base_prompt, challenge_prompt, documents_prompt, rubric_prompt)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO scenario (id, title, description, tags, base_prompt, challenge_prompt, documents_prompt, rubric_prompt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     input.id,
     input.title,
     input.description,
+    JSON.stringify(input.tags),
     input.basePrompt,
     input.challengePrompt,
     input.documentsPrompt,
@@ -317,7 +331,7 @@ function getScenarioById(db: Database.Database, id: string): Scenario | null {
   const row = db
     .prepare(
       `
-        SELECT id, title, description, base_prompt, challenge_prompt, documents_prompt, rubric_prompt
+        SELECT id, title, description, tags, base_prompt, challenge_prompt, documents_prompt, rubric_prompt
         FROM scenario
         WHERE id = ?
       `
@@ -338,12 +352,13 @@ function updateScenario(
   db.prepare(
     `
       UPDATE scenario
-      SET title = ?, description = ?, base_prompt = ?, challenge_prompt = ?, documents_prompt = ?, rubric_prompt = ?
+      SET title = ?, description = ?, tags = ?, base_prompt = ?, challenge_prompt = ?, documents_prompt = ?, rubric_prompt = ?
       WHERE id = ?
     `
   ).run(
     next.title,
     next.description,
+    JSON.stringify(next.tags),
     next.basePrompt,
     next.challengePrompt,
     next.documentsPrompt,
@@ -371,7 +386,7 @@ function createScenariosStore(db: Database.Database): ScenarioStore {
       const rows = db
         .prepare(
           `
-            SELECT id, title, description, base_prompt, challenge_prompt, documents_prompt, rubric_prompt
+            SELECT id, title, description, tags, base_prompt, challenge_prompt, documents_prompt, rubric_prompt
             FROM scenario
             ORDER BY id ASC
           `
@@ -919,6 +934,7 @@ function assertSchemaCompatibility(db: Database.Database): void {
       "id",
       "title",
       "description",
+      "tags",
       "base_prompt",
       "challenge_prompt",
       "documents_prompt",
@@ -1003,6 +1019,7 @@ function createBaseTables(db: Database.Database): void {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL DEFAULT '',
       description TEXT NOT NULL DEFAULT '',
+      tags TEXT NOT NULL DEFAULT '[]',
       base_prompt TEXT NOT NULL,
       challenge_prompt TEXT NOT NULL,
       documents_prompt TEXT NOT NULL,
@@ -1095,6 +1112,9 @@ function migrateScenarioTable(db: Database.Database): void {
     db.exec(
       "ALTER TABLE scenario ADD COLUMN description TEXT NOT NULL DEFAULT '';"
     );
+  }
+  if (!tableHasColumn(db, "scenario", "tags")) {
+    db.exec("ALTER TABLE scenario ADD COLUMN tags TEXT NOT NULL DEFAULT '[]';");
   }
 }
 

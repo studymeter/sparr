@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useReducer,
   useState,
   useSyncExternalStore,
@@ -43,7 +44,12 @@ type DashboardStats = {
   totalResults: number;
   recentResults: DashboardResult[];
 };
-type ScenarioSummary = { id: string; title: string; challengePrompt: string };
+type ScenarioSummary = {
+  id: string;
+  title: string;
+  challengePrompt: string;
+  tags: string[];
+};
 type Persona = {
   id: string;
   scenarioId: string;
@@ -55,6 +61,7 @@ type ScenarioDetail = {
   id: string;
   title: string;
   description: string;
+  tags: string[];
   basePrompt: string;
   challengePrompt: string;
   documentsPrompt: string;
@@ -117,6 +124,7 @@ type ScenarioFormState = {
   id: string;
   title: string;
   description: string;
+  tags: string[];
   basePrompt: string;
   challengePrompt: string;
   documentsPrompt: string;
@@ -161,11 +169,18 @@ function scenarioLabel(scenario: ScenarioSummary): string {
   return scenario.title || scenario.id;
 }
 
+function distinctSortedTags(list: ScenarioSummary[]): string[] {
+  return [...new Set(list.flatMap((scenario) => scenario.tags))].sort(
+    (left, right) => left.localeCompare(right)
+  );
+}
+
 function toFormState(detail: ScenarioDetail): ScenarioFormState {
   return {
     id: detail.id,
     title: detail.title,
     description: detail.description,
+    tags: detail.tags,
     basePrompt: detail.basePrompt,
     challengePrompt: detail.challengePrompt,
     documentsPrompt: detail.documentsPrompt,
@@ -465,6 +480,43 @@ const ST = {
     whiteSpace: "nowrap",
   } as React.CSSProperties,
   scBtns: { display: "flex", gap: 6, flexShrink: 0 } as React.CSSProperties,
+  tagBadgeRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  } as React.CSSProperties,
+  tagBadge: {
+    display: "inline-block",
+    fontSize: 11,
+    color: "var(--muted)",
+    background: "var(--bg)",
+    border: "1px solid var(--border)",
+    borderRadius: 999,
+    padding: "2px 9px",
+    whiteSpace: "nowrap",
+  } as React.CSSProperties,
+  tagChip: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    fontSize: 12,
+    color: "var(--text)",
+    background: "var(--bg)",
+    border: "1px solid var(--border)",
+    borderRadius: 999,
+    padding: "2px 6px 2px 10px",
+    whiteSpace: "nowrap",
+  } as React.CSSProperties,
+  tagChipRemove: {
+    border: "none",
+    background: "transparent",
+    color: "var(--muted)",
+    cursor: "pointer",
+    fontSize: 13,
+    lineHeight: 1,
+    padding: "0 4px",
+  } as React.CSSProperties,
   addBox: {
     border: "1px solid var(--border)",
     borderRadius: 18,
@@ -701,7 +753,9 @@ const ST = {
   accountWrap: { maxWidth: 460 } as React.CSSProperties,
   scenarioToolbar: {
     display: "flex",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
     marginBottom: 16,
   } as React.CSSProperties,
   userModalsModal: {
@@ -2574,6 +2628,19 @@ function EditUserModal({
 
 // ── Scenarios ─────────────────────────────────────────────────────────────────
 
+function ScenarioTagBadges({ tags }: { tags: string[] }) {
+  if (tags.length === 0) return null;
+  return (
+    <div style={ST.tagBadgeRow}>
+      {tags.map((tag) => (
+        <span key={tag} style={ST.tagBadge}>
+          {tag}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function ScenarioItem({
   scenario,
   onResults,
@@ -2595,6 +2662,7 @@ function ScenarioItem({
           <div style={ST.scChallenge} title={scenario.challengePrompt}>
             {scenario.challengePrompt}
           </div>
+          <ScenarioTagBadges tags={scenario.tags} />
         </div>
         <div style={ST.scBtns}>
           <button
@@ -2857,13 +2925,48 @@ function ScenarioModals({
   return null;
 }
 
-function Scenarios() {
+function ScenarioToolbar({
+  tagFilter,
+  setTagFilter,
+  availableTags,
+  onCreate,
+}: {
+  tagFilter: string;
+  setTagFilter: (val: string) => void;
+  availableTags: string[];
+  onCreate: () => void;
+}) {
+  const t = useTranslations("admin");
+  return (
+    <div style={ST.scenarioToolbar}>
+      <select
+        className="auth-input"
+        style={{ width: 180 }}
+        value={tagFilter}
+        onChange={(ev) => setTagFilter(ev.target.value)}
+      >
+        <option value="">{t("scenarios.allTags")}</option>
+        {availableTags.map((tag) => (
+          <option key={tag} value={tag}>
+            {tag}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        className="auth-btn"
+        style={{ width: "auto", padding: "10px 28px" }}
+        onClick={onCreate}
+      >
+        {t("newCreate")}
+      </button>
+    </div>
+  );
+}
+
+function useScenarioList(refreshKey: number) {
   const [list, setList] = useState<ScenarioSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState<ScenarioModal | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const { statusErr, statusOk, setStatusErr, notify } = useAdminStatus();
-  const reload = useCallback(() => setRefreshKey((prev) => prev + 1), []);
   useEffect(() => {
     let active = true;
     (async () => {
@@ -2877,6 +2980,27 @@ function Scenarios() {
       active = false;
     };
   }, [refreshKey]);
+  return { list, loading };
+}
+
+function Scenarios() {
+  const [modal, setModal] = useState<ScenarioModal | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [tagFilter, setTagFilter] = useState("");
+  const { statusErr, statusOk, setStatusErr, notify } = useAdminStatus();
+  const reload = useCallback(() => setRefreshKey((prev) => prev + 1), []);
+  const { list, loading } = useScenarioList(refreshKey);
+  const availableTags = useMemo(() => distinctSortedTags(list), [list]);
+  // A tag can disappear from the list (edited/deleted elsewhere) while still
+  // selected; fall back to "no filter" instead of matching nothing forever.
+  const effectiveTagFilter = availableTags.includes(tagFilter) ? tagFilter : "";
+  const filteredList = useMemo(
+    () =>
+      effectiveTagFilter
+        ? list.filter((sc) => sc.tags.includes(effectiveTagFilter))
+        : list,
+    [list, effectiveTagFilter]
+  );
   const openCreate = () => {
     setStatusErr(null);
     setModal({ kind: "create" });
@@ -2885,22 +3009,17 @@ function Scenarios() {
     setModal(null);
     setStatusErr(msg);
   };
-  const t = useTranslations("admin");
   return (
     <div>
       <StatusMsg error={statusErr} ok={statusOk} />
-      <div style={ST.scenarioToolbar}>
-        <button
-          type="button"
-          className="auth-btn"
-          style={{ width: "auto", padding: "10px 28px" }}
-          onClick={openCreate}
-        >
-          {t("newCreate")}
-        </button>
-      </div>
+      <ScenarioToolbar
+        tagFilter={effectiveTagFilter}
+        setTagFilter={setTagFilter}
+        availableTags={availableTags}
+        onCreate={openCreate}
+      />
       <ScenarioList
-        list={list}
+        list={filteredList}
         loading={loading}
         onResults={(sc) => setModal({ kind: "results", scenario: sc })}
         onEdit={(sc) => setModal({ kind: "edit", id: sc.id })}
@@ -2961,6 +3080,65 @@ function ScenarioIdField({
       >
         {state.id}
       </div>
+    </div>
+  );
+}
+
+function TagsField({
+  tags,
+  onChange,
+  busy,
+}: {
+  tags: string[];
+  onChange: (tags: string[]) => void;
+  busy: boolean;
+}) {
+  const ts = useTranslations("admin.scenarios");
+  const [draft, setDraft] = useState("");
+
+  const addDraftTag = () => {
+    const next = draft.trim();
+    setDraft("");
+    if (next.length === 0 || tags.includes(next)) return;
+    onChange([...tags, next]);
+  };
+  const removeTag = (index: number) =>
+    onChange(tags.filter((_, i) => i !== index));
+
+  return (
+    <div className="auth-field">
+      <label className="auth-label">{ts("tagsLabel")}</label>
+      {tags.length > 0 && (
+        <div style={ST.tagBadgeRow}>
+          {tags.map((tag, index) => (
+            <span key={`${tag}-${index}`} style={ST.tagChip}>
+              {tag}
+              <button
+                type="button"
+                style={ST.tagChipRemove}
+                onClick={() => removeTag(index)}
+                disabled={busy}
+                aria-label={ts("tagRemove", { tag })}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <input
+        className="auth-input"
+        type="text"
+        value={draft}
+        onChange={(ev) => setDraft(ev.target.value)}
+        onKeyDown={(ev) => {
+          if (ev.key !== "Enter") return;
+          ev.preventDefault();
+          addDraftTag();
+        }}
+        disabled={busy}
+        placeholder={ts("tagsPlaceholder")}
+      />
     </div>
   );
 }
@@ -3158,6 +3336,11 @@ function ScenarioFormBody({
           disabled={busy}
         />
       </div>
+      <TagsField
+        tags={state.tags}
+        onChange={(tags) => setState({ tags })}
+        busy={busy}
+      />
       {promptFields.map((def) => (
         <PromptField key={def.key} def={def} busy={busy} />
       ))}
@@ -3174,6 +3357,7 @@ const EMPTY_FORM: ScenarioFormState = {
   id: "",
   title: "",
   description: "",
+  tags: [],
   basePrompt: "",
   challengePrompt: "",
   documentsPrompt: "",

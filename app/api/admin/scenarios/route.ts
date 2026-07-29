@@ -7,6 +7,14 @@ import type { PersonaCreateInput, ScenarioCreateInput } from "@/lib/providers";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function normalizeTags(tags: unknown): string[] {
+  if (!Array.isArray(tags)) return [];
+  return tags
+    .filter((tag): tag is string => typeof tag === "string")
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0);
+}
+
 export async function GET() {
   try {
     const principal = await getPrincipal();
@@ -20,6 +28,7 @@ export async function GET() {
         id: scenario.id,
         title: scenario.title,
         challengePrompt: scenario.challengePrompt,
+        tags: scenario.tags,
       }))
     );
   } catch (err) {
@@ -52,6 +61,7 @@ export async function POST(req: Request) {
       id: body.id?.trim() || uid("scenario_"),
       title: body.title ?? "",
       description: body.description ?? "",
+      tags: normalizeTags(body.tags),
       basePrompt: body.basePrompt,
       challengePrompt: body.challengePrompt,
       documentsPrompt: body.documentsPrompt,

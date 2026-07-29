@@ -1594,7 +1594,7 @@ components:
 
     AdminScenarioSummary:
       type: object
-      required: [id, title, challengePrompt]
+      required: [id, title, challengePrompt, tags]
       properties:
         id:
           type: string
@@ -1602,13 +1602,26 @@ components:
           type: string
         challengePrompt:
           type: string
+        tags:
+          type: array
+          items:
+            type: string
 
     AdminScenarioDetail:
       type: object
-      required: [id, basePrompt, challengePrompt, documentsPrompt, rubricPrompt, personas]
+      required: [id, title, description, basePrompt, challengePrompt, documentsPrompt, rubricPrompt, personas]
       properties:
         id:
           type: string
+        title:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+          description: Free-form labels for categorizing/filtering scenarios in the admin dashboard.
         basePrompt:
           type: string
         challengePrompt:
@@ -1629,6 +1642,17 @@ components:
         id:
           type: string
           description: Omit to auto-generate a new scenario ID (uid()).
+        title:
+          type: string
+          description: Omit for an empty title.
+        description:
+          type: string
+          description: Omit for an empty description.
+        tags:
+          type: array
+          items:
+            type: string
+          description: Omit for no tags. Blank entries are dropped server-side.
         basePrompt:
           type: string
         challengePrompt:
@@ -1645,6 +1669,10 @@ components:
     AdminScenarioUpdateRequest:
       type: object
       properties:
+        tags:
+          type: array
+          items:
+            type: string
         basePrompt:
           type: string
         challengePrompt:

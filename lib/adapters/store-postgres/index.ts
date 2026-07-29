@@ -19,7 +19,7 @@ import { uid } from "@/lib/id";
 import { TICKET_INITIAL_GRANT_COUNT } from "@/lib/constants";
 
 type Queryable = Pool | PoolClient;
-const POSTGRES_SCHEMA_VERSION = 1;
+const POSTGRES_SCHEMA_VERSION = 2;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -254,13 +254,14 @@ async function insertScenario(
   await pool.query(
     `
       INSERT INTO scenario
-      (id, title, description, base_prompt, challenge_prompt, documents_prompt, rubric_prompt)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      (id, title, description, tags, base_prompt, challenge_prompt, documents_prompt, rubric_prompt)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `,
     [
       input.id,
       input.title,
       input.description,
+      input.tags,
       input.basePrompt,
       input.challengePrompt,
       input.documentsPrompt,
@@ -273,7 +274,7 @@ async function insertScenario(
 async function listScenarios(pool: Pool): Promise<Scenario[]> {
   const result = await pool.query(
     `
-      SELECT id, title, description, base_prompt AS "basePrompt", challenge_prompt AS "challengePrompt",
+      SELECT id, title, description, tags, base_prompt AS "basePrompt", challenge_prompt AS "challengePrompt",
              documents_prompt AS "documentsPrompt", rubric_prompt AS "rubricPrompt"
       FROM scenario
       ORDER BY id ASC
@@ -283,6 +284,7 @@ async function listScenarios(pool: Pool): Promise<Scenario[]> {
     id: string;
     title: string;
     description: string;
+    tags: string[];
     basePrompt: string;
     challengePrompt: string;
     documentsPrompt: string;
@@ -296,7 +298,7 @@ function createScenarioStore(pool: Pool): Store["scenarios"] {
     async get(id) {
       const result = await pool.query(
         `
-          SELECT id, title, description, base_prompt AS "basePrompt", challenge_prompt AS "challengePrompt",
+          SELECT id, title, description, tags, base_prompt AS "basePrompt", challenge_prompt AS "challengePrompt",
                  documents_prompt AS "documentsPrompt", rubric_prompt AS "rubricPrompt"
           FROM scenario WHERE id = $1
         `,
@@ -311,12 +313,13 @@ function createScenarioStore(pool: Pool): Store["scenarios"] {
       await pool.query(
         `
           UPDATE scenario
-          SET title = $1, description = $2, base_prompt = $3, challenge_prompt = $4, documents_prompt = $5, rubric_prompt = $6
-          WHERE id = $7
+          SET title = $1, description = $2, tags = $3, base_prompt = $4, challenge_prompt = $5, documents_prompt = $6, rubric_prompt = $7
+          WHERE id = $8
         `,
         [
           next.title,
           next.description,
+          next.tags,
           next.basePrompt,
           next.challengePrompt,
           next.documentsPrompt,
@@ -872,6 +875,7 @@ async function createTables(pool: Pool): Promise<void> {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL DEFAULT '',
       description TEXT NOT NULL DEFAULT '',
+      tags TEXT[] NOT NULL DEFAULT '{}',
       base_prompt TEXT NOT NULL,
       challenge_prompt TEXT NOT NULL,
       documents_prompt TEXT NOT NULL,
@@ -943,6 +947,9 @@ async function applyColumnMigrations(pool: Pool): Promise<void> {
   );
   await pool.query(
     "ALTER TABLE scenario ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''"
+  );
+  await pool.query(
+    "ALTER TABLE scenario ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}'"
   );
   await pool.query(
     "ALTER TABLE ticket_ledger ADD COLUMN IF NOT EXISTS is_active BOOLEAN"

@@ -23,6 +23,7 @@ export type Scenario = {
   id: string;
   title: string;
   description: string;
+  tags: string[];
   basePrompt: string;
   challengePrompt: string;
   documentsPrompt: string;

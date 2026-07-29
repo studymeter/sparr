@@ -27,7 +27,7 @@ function cloneOAuthAccount(row: OAuthAccount): OAuthAccount {
 }
 
 function cloneScenario(row: Scenario): Scenario {
-  return { ...row };
+  return { ...row, tags: [...row.tags] };
 }
 
 function clonePersona(row: Persona): Persona {
@@ -458,7 +458,11 @@ function createTicketGrantMethods(
       return createMemoryTicketBatch(ticketLedger, accountId, type, count);
     },
     async ensureRegistrationGrants(accountId, targetCount) {
-      return ensureMemoryRegistrationGrants(ticketLedger, accountId, targetCount);
+      return ensureMemoryRegistrationGrants(
+        ticketLedger,
+        accountId,
+        targetCount
+      );
     },
     async listByAccount(accountId, limit = 20) {
       return [...ticketLedger.values()]

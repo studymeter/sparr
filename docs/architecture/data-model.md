@@ -36,6 +36,7 @@ erDiagram
     string id PK
     string title
     string description
+    string[] tags
     string base_prompt
     string challenge_prompt
     string documents_prompt
@@ -83,7 +84,7 @@ erDiagram
 
 - **ACCOUNT** — A player or administrator, distinguished by `role` (`player` or `admin`). Stores `email`, `username`, `created_at` (registration time), an optional `password_hash` (bcrypt; `null` for accounts that authenticate only via OAuth), `email_verified`, and an optional `stripe_customer_id` (the Stripe Customer linked to this account). Its result history is the set of `RESULT` rows that reference it; its linked sign-in providers are its `OAUTH_ACCOUNT` rows; its playable-session credits are the `TICKET_LEDGER` rows that reference it (players only).
 - **OAUTH_ACCOUNT** — A link between an `ACCOUNT` and an external OAuth provider (Auth.js calls this an `Account`; named `OAUTH_ACCOUNT` here to avoid colliding with the app's `ACCOUNT`). Holds `provider` and `provider_account_id` (the user's id at that provider). One account may link several providers.
-- **SCENARIO** — An authored scenario. Carries player-facing display fields — `title` and `description` (shown on the scenario-selection screen) — plus four prompts: `base_prompt` (the base scenario and world), `challenge_prompt` (the problem the player must solve), `documents_prompt` (how to generate the initial reference material), and `rubric_prompt` (how to score the session). Its cast is the list of `PERSONA` rows that reference it.
+- **SCENARIO** — An authored scenario. Carries player-facing display fields — `title` and `description` (shown on the scenario-selection screen) — an admin-facing `tags` list (free-form labels for categorizing/filtering scenarios in the admin dashboard; not shown to players) — plus four prompts: `base_prompt` (the base scenario and world), `challenge_prompt` (the problem the player must solve), `documents_prompt` (how to generate the initial reference material), and `rubric_prompt` (how to score the session). Its cast is the list of `PERSONA` rows that reference it.
 - **PERSONA** — One character belonging to a scenario: `character_prompt` (personality and role setup), `voice_code` (the generative-AI voice name), and `doc_tool_enabled` (whether this character may produce work documents).
 - **RESULT** — The outcome of a finished session: `summary` (a summary of the interaction) and `evaluation` (the scored feedback). It always references the `SCENARIO` played. `account_id` is `null` for anonymous sessions; otherwise it references the `ACCOUNT` that played.
 - **SETTING** — System configuration (AI, voice, …), stored as a `key`/`value` pair with `updated_at` recording the last change.
