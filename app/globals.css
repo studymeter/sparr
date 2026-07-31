@@ -359,6 +359,18 @@ button {
   margin: 0 0 14px;
   font-size: 24px;
 }
+.pc-doc-modal-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.pc-doc-modal-text {
+  font-size: 15px;
+}
 .giveup-tag {
   display: inline-block;
   font-size: 11px;
@@ -375,6 +387,7 @@ button {
   line-height: 1.85;
   color: #374151;
   margin: 0;
+  white-space: pre-line;
 }
 .giveup-actions {
   display: flex;
@@ -1546,7 +1559,7 @@ button {
   border: 1px solid var(--border);
   border-radius: 22px;
   box-shadow: var(--shadow-sm);
-  padding: 30px 24px 26px;
+  padding: 56px 20px 36px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2883,7 +2896,8 @@ button {
     margin-bottom: 10px;
   }
   .pc-doc-badge {
-    margin-top: 4px;
+    top: 10px;
+    left: 10px;
   }
   .btn-primary.squarish {
     width: 100%;
@@ -4037,6 +4051,29 @@ body {
   color: var(--sm-primary);
 }
 
+.mp-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* btn-tertiaryの見た目はそのまま、大きさと並びだけ元のタグバッジに合わせる */
+.mp-card-tags .mp-card-tag {
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 400;
+  gap: 0;
+}
+
+/* 説明文の長さがカードごとに違っても、Startボタンは常にカード下端に揃える */
+.mp-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  width: 100%;
+  margin-top: auto;
+}
+
 .mp-ticket-note {
   margin: 0 0 12px;
   font-size: 13px;
@@ -4300,17 +4337,21 @@ body {
   color: #ffffff;
 }
 .pc-doc-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-top: 10px;
   padding: 5px 10px;
   border-radius: 10px;
   background: #eff6ff;
   color: #3b82f6;
+  font: inherit;
   font-size: 11px;
   font-weight: 600;
   border: 1px solid #bfdbfe;
+  cursor: pointer;
 }
 
 /* Doc-list badge → DS pill tint */

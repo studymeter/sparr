@@ -87,11 +87,11 @@ function useLeaveGuard() {
   return { showLeaveConfirm, stayOnPage, leavePage };
 }
 
-function DocBadgeIcon() {
+function DocBadgeIcon({ size = 11 }: { size?: number }) {
   return (
     <svg
-      width="11"
-      height="11"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       aria-hidden="true"
@@ -267,6 +267,27 @@ function HubHeader() {
   );
 }
 
+function DocBadgeInfoModal({ onClose }: { onClose: () => void }) {
+  const t = useTranslations("game.hub");
+  const tc = useTranslations("common");
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal giveup" onClick={(ev) => ev.stopPropagation()}>
+        <h2 className="pc-doc-modal-title">
+          <DocBadgeIcon size={20} />
+          {t("docBadge")}
+        </h2>
+        <p className="giveup-warn pc-doc-modal-text">{t("docBadgeExplain")}</p>
+        <div className="giveup-actions">
+          <button className="btn-primary" onClick={onClose}>
+            {tc("close")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PersonaCard({
   contact,
   index,
@@ -277,16 +298,24 @@ function PersonaCard({
   onCall: (stakeholderId: string) => void;
 }) {
   const t = useTranslations("game.hub");
+  const [showDocInfo, setShowDocInfo] = useState(false);
   return (
     <div className="persona-card">
       <div className={`pc-avatar pc-color-${index % 3}`}>
         {contact.name.trim().slice(0, 1)}
       </div>
       {contact.docToolEnabled && (
-        <span className="pc-doc-badge">
+        <button
+          type="button"
+          className="pc-doc-badge"
+          onClick={() => setShowDocInfo(true)}
+        >
           <DocBadgeIcon />
           {t("docBadge")}
-        </span>
+        </button>
+      )}
+      {showDocInfo && (
+        <DocBadgeInfoModal onClose={() => setShowDocInfo(false)} />
       )}
       <div className="pc-name">{contact.name}</div>
       <div className="pc-company">{contact.company}</div>

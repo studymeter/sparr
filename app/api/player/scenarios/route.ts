@@ -18,6 +18,7 @@ export async function GET() {
         id: scenario.id,
         title: scenario.title,
         description: scenario.description,
+        tags: scenario.tags,
       }))
     );
   } catch (err) {

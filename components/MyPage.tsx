@@ -40,6 +40,7 @@ type ScenarioCard = {
   id: string;
   title: string;
   description: string;
+  tags: string[];
 };
 
 type ResultRow = {
@@ -362,14 +363,43 @@ function SearchIcon() {
   );
 }
 
+function ScenarioTagBadges({
+  tags,
+  onTagClick,
+}: {
+  tags: string[];
+  onTagClick: (tag: string) => void;
+}) {
+  if (tags.length === 0) return null;
+  return (
+    <div className="mp-card-tags">
+      {tags.map((tag) => (
+        <button
+          type="button"
+          className="btn-tertiary mp-card-tag"
+          key={tag}
+          onClick={(ev) => {
+            ev.stopPropagation();
+            onTagClick(tag);
+          }}
+        >
+          {tag}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ScenarioList({
   scenarios,
   onSelect,
   onOpenDetail,
+  onTagClick,
 }: {
   scenarios: ScenarioCard[];
   onSelect: (scenario: ScenarioCard) => void;
   onOpenDetail: (scenario: ScenarioCard) => void;
+  onTagClick: (tag: string) => void;
 }) {
   const t = useTranslations("mypage");
   const tc = useTranslations("common");
@@ -381,14 +411,8 @@ function ScenarioList({
           <span className="mp-card-desc">
             {truncate(sc.description || t("noDescription"), 75)}
           </span>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "end",
-              width: "100%",
-            }}
-          >
+          <ScenarioTagBadges tags={sc.tags} onTagClick={onTagClick} />
+          <div className="mp-card-actions">
             <button
               type="button"
               className="btn-primary"
@@ -410,10 +434,12 @@ function ScenarioDetailModal({
   scenario,
   onClose,
   onStart,
+  onTagClick,
 }: {
   scenario: ScenarioCard;
   onClose: () => void;
   onStart: () => void;
+  onTagClick: (tag: string) => void;
 }) {
   const t = useTranslations("mypage");
   const tc = useTranslations("common");
@@ -428,6 +454,7 @@ function ScenarioDetailModal({
           <p className="mp-confirm-text mp-detail-text">
             {scenario.description || t("noDescription")}
           </p>
+          <ScenarioTagBadges tags={scenario.tags} onTagClick={onTagClick} />
           <div className="mp-confirm-actions">
             <button type="button" className="btn-tertiary" onClick={onClose}>
               {tc("close")}
@@ -440,6 +467,26 @@ function ScenarioDetailModal({
       </div>
     </div>
   );
+}
+
+function matchesScenarioQuery(sc: ScenarioCard, query: string): boolean {
+  if (!query) return true;
+  const lowerQuery = query.toLowerCase();
+  return (
+    sc.title.toLowerCase().includes(lowerQuery) ||
+    sc.description.toLowerCase().includes(lowerQuery) ||
+    sc.tags.some((tag) => tag.toLowerCase().includes(lowerQuery))
+  );
+}
+
+function makeTagClickHandler(
+  setSearchQuery: (value: string) => void,
+  setDetailScenario: (value: ScenarioCard | null) => void
+): (tag: string) => void {
+  return (tag) => {
+    setSearchQuery(tag);
+    setDetailScenario(null);
+  };
 }
 
 function ScenarioSection({
@@ -457,14 +504,10 @@ function ScenarioSection({
   const [detailScenario, setDetailScenario] = useState<ScenarioCard | null>(
     null
   );
-  const filteredScenarios = scenarios.filter((sc) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      sc.title.toLowerCase().includes(query) ||
-      sc.description.toLowerCase().includes(query)
-    );
-  });
+  const filteredScenarios = scenarios.filter((sc) =>
+    matchesScenarioQuery(sc, searchQuery)
+  );
+  const handleTagClick = makeTagClickHandler(setSearchQuery, setDetailScenario);
   return (
     <section className="mp-section">
       <h2 className="mp-section-title">{t("scenariosSection")}</h2>
@@ -487,6 +530,7 @@ function ScenarioSection({
           scenarios={filteredScenarios}
           onSelect={onSelect}
           onOpenDetail={setDetailScenario}
+          onTagClick={handleTagClick}
         />
       )}
       {detailScenario && (
@@ -497,6 +541,7 @@ function ScenarioSection({
             onSelect(detailScenario);
             setDetailScenario(null);
           }}
+          onTagClick={handleTagClick}
         />
       )}
     </section>
