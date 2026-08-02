@@ -53,6 +53,8 @@ export async function POST(
     };
     const store = await providers.getStore();
     const scenario = await store.scenarios.update(id, {
+      title: body.title,
+      description: body.description,
       tags: normalizeTags(body.tags),
       basePrompt: body.basePrompt,
       challengePrompt: body.challengePrompt,
