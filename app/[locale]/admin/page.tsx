@@ -3136,6 +3136,10 @@ function TagsField({
           ev.preventDefault();
           addDraftTag();
         }}
+        // NOTE: Commit the pending draft when focus leaves the field, so a tag
+        // typed without Enter is not silently dropped when the user clicks
+        // save (blur fires before the submit click is processed).
+        onBlur={addDraftTag}
         disabled={busy}
         placeholder={ts("tagsPlaceholder")}
       />
