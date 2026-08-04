@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import BrandLogo from "@/components/BrandLogo";
+import { APP_HOME_URL } from "@/lib/constants";
 import type { GameState } from "@/lib/types";
 import type { ScoreResult } from "@/lib/prompts/score";
 
@@ -268,7 +269,7 @@ function RevealedView({
     <div className="briefing result-page">
       <div className="briefing-inner">
         <header className="mp-header briefing-header">
-          <a href="https://sparr.studymeter.jp/" className="mp-brand">
+          <a href={APP_HOME_URL} className="mp-brand">
             <BrandLogo />
           </a>
         </header>
