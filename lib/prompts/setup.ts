@@ -17,7 +17,8 @@ export const SETUP_SYSTEM_PROMPT = `あなたは、音声ロールプレイ訓�
 
 # 登場人物（stakeholders）
 - 入力の PERSONA 1件につき1人を、**同じ順序・同じ人数で**生成する。
-- 各 PERSONA の characterPrompt を読み、役割ラベル(role)・氏名(name)・所属/組織像(company)・視点の状況(situation)・性格や話し方(persona)・目的(goal)・開始時の機嫌(moodStart: 0〜10の整数)・最初の一言の切り出し方(openingInstruction)を具体化する。
+- 各 PERSONA の characterPrompt を読み、役割ラベル(role)・氏名(name)・所属/組織像(company)・プレイヤーから見た関係(relationToPlayer)・視点の状況(situation)・性格や話し方(persona)・目的(goal)・開始時の機嫌(moodStart: 0〜10の整数)・最初の一言の切り出し方(openingInstruction)を具体化する。
+- relationToPlayer は「プレイヤーにとってこの人が誰なのか」を一目で分かる短い一言にする（例: あなたの上司 / 発注元企業の担当者 / 開発チームのメンバー）。組織名や役職の羅列ではなく、プレイヤー起点の関係で書く。
 - relationToRootCause は、その人物が真因をどれだけ知る/隠すかを characterPrompt から判断し "unaware" / "partial" / "hiding" のいずれかにする。
 - 氏名は毎回バラけさせ、ありがちな姓に偏らない。実在の有名人名は使わない。役割ラベルは characterPrompt が示す立場に沿った自然な日本語にする。
 - voiceCode / docToolEnabled は出力しない（サーバが PERSONA から付与する）。
@@ -46,6 +47,7 @@ export const SETUP_SYSTEM_PROMPT = `あなたは、音声ロールプレイ訓�
       "role": "役割ラベル",
       "name": "氏名",
       "company": "所属・組織像",
+      "relationToPlayer": "プレイヤーから見た関係（例: あなたの上司）",
       "situation": "この人物視点の状況",
       "relationToRootCause": "unaware | partial | hiding",
       "persona": "性格・話し方",

@@ -188,6 +188,7 @@
       "subtitleLine2": "Press \"Finish & score\" to end the scenario and see your evaluation.",
       "docBadge": "Can generate docs",
       "docBadgeExplain": "You can ask anyone with this badge to create a document you need, right during the call.\nRequested documents are added to the case folder a little while later.\nUse this whenever you need more information.",
+      "briefing": "Briefing",
       "startCall": "Start call",
       "caseFolder": "Case folder",
       "finishAndScore": "Finish & score",

@@ -40,6 +40,7 @@ export class FakeAIProvider implements AIProvider {
           role: `登場人物${i + 1}`,
           name: `テスト太郎${i + 1}`,
           company: "（fake）所属",
+          relationToPlayer: "（fake）あなたの同僚",
           situation: "（fake）この人物視点の状況",
           relationToRootCause: relation,
           persona: persona.characterPrompt,

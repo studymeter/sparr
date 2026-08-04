@@ -21,6 +21,7 @@ function personaBlock(stakeholder: Stakeholder, project: Project): string {
 - 氏名: ${stakeholder.name}
 - 立場: ${roleLabel(stakeholder.role)}
 - 所属/業種像: ${stakeholder.company}
+- プレイヤーとの関係: ${stakeholder.relationToPlayer}
 - 案件: ${project.title}
 - 全体状況: ${project.situation}
 - このキャラ視点の状況: ${stakeholder.situation}

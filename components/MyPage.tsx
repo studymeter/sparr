@@ -10,6 +10,7 @@ import type { Locale } from "@/i18n/routing";
 import { formatDateTime as formatDate } from "@/lib/i18n/formatDate";
 import SignOutButton from "@/components/SignOutButton";
 import Footer from "@/components/Footer";
+import { APP_HOME_URL } from "@/lib/constants";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import BrandLogo from "@/components/BrandLogo";
 
@@ -264,7 +265,7 @@ function MyPageHeader({
   const t = useTranslations("mypage");
   return (
     <header className="mp-header">
-      <Link href="https://sparr.studymeter.jp/" className="mp-brand">
+      <Link href={APP_HOME_URL} className="mp-brand">
         <BrandLogo />
       </Link>
 

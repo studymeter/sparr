@@ -6,8 +6,8 @@ import DocumentViewer from "@/components/DocumentViewer";
 import CornerDeco from "@/components/CornerDeco";
 import BrandLogo from "@/components/BrandLogo";
 import { useGame } from "@/app/store";
-import { PLAY_TIME_REMINDER_MS } from "@/lib/constants";
-import type { GameState, Stakeholder } from "@/lib/types";
+import { APP_HOME_URL, PLAY_TIME_REMINDER_MS } from "@/lib/constants";
+import type { Briefing, GameState, Stakeholder } from "@/lib/types";
 
 const PLAY_TIME_TICK_MS = 1000;
 
@@ -260,7 +260,7 @@ function PlayTimeReminderModal({
 function HubHeader() {
   return (
     <header className="mp-header briefing-header">
-      <a href="https://sparr.studymeter.jp/" className="mp-brand">
+      <a href={APP_HOME_URL} className="mp-brand">
         <BrandLogo />
       </a>
     </header>
@@ -318,7 +318,10 @@ function PersonaCard({
         <DocBadgeInfoModal onClose={() => setShowDocInfo(false)} />
       )}
       <div className="pc-name">{contact.name}</div>
-      <div className="pc-company">{contact.company}</div>
+      {/* relationToPlayer 未設定（古い生成データ）の場合のみ所属で代替する */}
+      <div className="pc-company">
+        {contact.relationToPlayer || contact.company}
+      </div>
       <button
         type="button"
         className="btn-primary"
@@ -331,16 +334,128 @@ function PersonaCard({
   );
 }
 
+function BriefingIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect
+        x="8"
+        y="2"
+        width="8"
+        height="4"
+        rx="1"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <line
+        x1="9"
+        y1="12"
+        x2="15"
+        y2="12"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <line
+        x1="9"
+        y1="16"
+        x2="13"
+        y2="16"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+// 状況を確認し直せるよう、Briefing 画面と同じ内容（状況・きっかけ・あなたの仕事）
+// を Hub からポップアップで再表示する。
+function BriefingModal({
+  briefing,
+  onClose,
+}: {
+  briefing: Briefing;
+  onClose: () => void;
+}) {
+  const tb = useTranslations("game.briefing");
+  const tc = useTranslations("common");
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal brief hub-briefing-modal"
+        onClick={(ev) => ev.stopPropagation()}
+      >
+        <h2 className="hub-briefing-title">{tb("title")}</h2>
+        <div className="brief-card">
+          <span className="brief-label label-blue">{tb("situation")}</span>
+          <p>{briefing.overview}</p>
+        </div>
+        <div className="brief-card">
+          <span className="brief-label label-purple">{tb("trigger")}</span>
+          <p>{briefing.trouble}</p>
+        </div>
+        <div className="brief-card">
+          <span className="brief-label label-blue">{tb("yourJob")}</span>
+          <p>{tb("yourJobBody")}</p>
+        </div>
+        <div className="giveup-actions">
+          <button className="btn-primary" onClick={onClose}>
+            {tc("close")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BriefingButton({ briefing }: { briefing: Briefing }) {
+  const t = useTranslations("game.hub");
+  const [showBriefing, setShowBriefing] = useState(false);
+  return (
+    <>
+      <button
+        className="btn-tertiary shadow"
+        onClick={() => setShowBriefing(true)}
+      >
+        <BriefingIcon />
+        {t("briefing")}
+      </button>
+      {showBriefing && (
+        <BriefingModal
+          briefing={briefing}
+          onClose={() => setShowBriefing(false)}
+        />
+      )}
+    </>
+  );
+}
+
 function HubActions({
+  briefing,
   onOpenDocs,
   onGiveUp,
 }: {
+  briefing: Briefing;
   onOpenDocs: () => void;
   onGiveUp: () => void;
 }) {
   const t = useTranslations("game.hub");
   return (
     <div className="hub-actions">
+      <BriefingButton briefing={briefing} />
       <button className="btn-tertiary shadow" onClick={onOpenDocs}>
         <FolderIcon />
         {t("caseFolder")}
@@ -467,6 +582,7 @@ export default function Hub({
           </div>
 
           <HubActions
+            briefing={game.project.briefing}
             onOpenDocs={() => setShowDocs(true)}
             onGiveUp={onGiveUp}
           />

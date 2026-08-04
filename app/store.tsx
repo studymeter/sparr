@@ -65,6 +65,7 @@ function buildStakeholders(res: SetupResponse): Stakeholder[] {
     name: stakeholder.name,
     role: stakeholder.role,
     company: stakeholder.company,
+    relationToPlayer: stakeholder.relationToPlayer,
     situation: stakeholder.situation,
     relationToRootCause: stakeholder.relationToRootCause,
     persona: stakeholder.persona,

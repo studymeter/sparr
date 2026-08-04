@@ -988,6 +988,11 @@ button {
 .modal.brief {
   width: min(820px, 94vw);
 }
+/* Hub から開くブリーフィング再表示ポップアップ（余白は .brief を継承） */
+.hub-briefing-title {
+  margin: 0 0 20px;
+  font-size: 24px;
+}
 .brief {
   padding: 28px 36px 32px;
 }

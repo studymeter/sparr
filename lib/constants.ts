@@ -36,3 +36,6 @@ export const TICKET_INITIAL_GRANT_COUNT = 3;
 
 // Hub.tsx: この時間が経つと「そろそろ終了？」のリマインダーを出す (ms)
 export const PLAY_TIME_REMINDER_MS = 15 * 60 * 1000;
+
+// 左上ロゴの戻り先（アプリのトップ。sparr.studymeter.jp は紹介サイト側）
+export const APP_HOME_URL = "https://app.sparr.studymeter.jp/";
