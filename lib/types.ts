@@ -20,6 +20,7 @@ export type Stakeholder = {
   name: string; // 毎回生成（固定名にしない）
   role: string; // 役割ラベル（シナリオ固有。例: 購買部長 / ユーザー部門 など）
   company: string; // 所属・組織像
+  relationToPlayer: string; // プレイヤーから見た関係（例: あなたの上司 / 発注元の担当者）
   situation: string; // そのキャラ視点の状況
   relationToRootCause: RelationToRootCause;
   persona: string; // 性格・話し方
@@ -79,6 +80,7 @@ export type SetupResponse = {
     role: string;
     name: string;
     company: string;
+    relationToPlayer: string;
     situation: string;
     relationToRootCause: RelationToRootCause;
     persona: string;

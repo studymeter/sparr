@@ -869,6 +869,7 @@ components:
           role,
           name,
           company,
+          relationToPlayer,
           situation,
           relationToRootCause,
           persona,
@@ -883,6 +884,8 @@ components:
         name:
           type: string
         company:
+          type: string
+        relationToPlayer:
           type: string
         situation:
           type: string
@@ -958,6 +961,7 @@ components:
           name,
           role,
           company,
+          relationToPlayer,
           situation,
           relationToRootCause,
           persona,
@@ -974,6 +978,8 @@ components:
           type: string
           enum: [user_dept, manager, dev_member]
         company:
+          type: string
+        relationToPlayer:
           type: string
         situation:
           type: string

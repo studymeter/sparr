@@ -6,7 +6,7 @@ import DocumentViewer from "@/components/DocumentViewer";
 import CornerDeco from "@/components/CornerDeco";
 import BrandLogo from "@/components/BrandLogo";
 import { useGame } from "@/app/store";
-import { PLAY_TIME_REMINDER_MS } from "@/lib/constants";
+import { APP_HOME_URL, PLAY_TIME_REMINDER_MS } from "@/lib/constants";
 import type { Briefing, GameState, Stakeholder } from "@/lib/types";
 
 const PLAY_TIME_TICK_MS = 1000;
@@ -260,7 +260,7 @@ function PlayTimeReminderModal({
 function HubHeader() {
   return (
     <header className="mp-header briefing-header">
-      <a href="https://sparr.studymeter.jp/" className="mp-brand">
+      <a href={APP_HOME_URL} className="mp-brand">
         <BrandLogo />
       </a>
     </header>
@@ -318,7 +318,10 @@ function PersonaCard({
         <DocBadgeInfoModal onClose={() => setShowDocInfo(false)} />
       )}
       <div className="pc-name">{contact.name}</div>
-      <div className="pc-company">{contact.company}</div>
+      {/* relationToPlayer 未設定（古い生成データ）の場合のみ所属で代替する */}
+      <div className="pc-company">
+        {contact.relationToPlayer || contact.company}
+      </div>
       <button
         type="button"
         className="btn-primary"
