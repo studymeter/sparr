@@ -186,7 +186,6 @@ Rules of the road: don't bypass checks (`--no-verify`, etc.) or merge a red PR; 
 app/                    Next.js App Router — UI pages and API routes
 components/             React components (screens)
 lib/                    engine, providers, adapters, prompts, composition wiring
-prompts/                hand-written, fixed prompts
 docs/                   architecture and design docs
 scripts/                tooling (Cursor-hook bootstrap, doc tooling, …)
 public/                 static assets

@@ -252,7 +252,7 @@ paths:
       tags: [Scenario setup]
       summary: Generate a scenario instance
       description: |
-        1. No request body. The server assembles prompts from prompts/
+        1. No request body. The server assembles prompts from lib/prompts/
         2. Call AIProvider to generate a scenario instance
         3. Return SetupResponse (project / scenario / briefing / documents / stakeholders) with 200
 
