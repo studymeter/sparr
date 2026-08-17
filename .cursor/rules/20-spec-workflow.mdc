@@ -6,8 +6,8 @@ alwaysApply: true
 # 実装前の必読
 
 1. `docs/architecture/` … 概念図・コンポーネント・データモデル（設計の正本）
-2. `prompts/common_base.md` … 全キャラ共通の地（手書き固定。AIに生成させない）
-3. キャラ個別は `common_base` + 毎回ランダム生成ブロックの2層
+2. `lib/prompts/commonBase.ts` … 全キャラ共通の地（手書き固定。AIに生成させない）
+3. キャラ個別は `COMMON_BASE` + 毎回ランダム生成ブロックの2層
 
 # リファレンスシナリオの生成
 
